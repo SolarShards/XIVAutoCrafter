@@ -1,0 +1,8 @@
+# UI framework
+customtkinter
+CTkToolTip
+pillow
+numpy
+opencv-python
+pywin32
+pyautogui
