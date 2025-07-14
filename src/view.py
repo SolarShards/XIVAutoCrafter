@@ -1,8 +1,8 @@
 import customtkinter as ctk
 from CTkToolTip import *
 from collections.abc import Iterable
-from .ui_tabs.craft_tab import CraftTab
-from .ui_tabs.actions_tab import ActionsTab
+from .ui.craft_tab import CraftTab
+from .ui.actions_tab import ActionsTab
 from src.common import *
 
 class XIVAutoCrafterView(AutoCrafterViewInterface):

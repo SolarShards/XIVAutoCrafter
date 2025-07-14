@@ -3,6 +3,7 @@ from CTkToolTip import *
 from enum import Enum
 from collections.abc import Iterable
 from src.common import AutoCrafterControllerInterface, ControllerState, Notification
+from .custom_widgets import KeyComboWidget
 
 class ActionsTab(ctk.CTkFrame):
 
@@ -16,7 +17,7 @@ class ActionsTab(ctk.CTkFrame):
         self._controller_state = ControllerState.STOPPED
         self.pack(fill="both", expand=True)
 
-        # Right frame: copy of _recipe_frame
+        # Left frame: custom actions
         self._custom_actions_frame = ctk.CTkFrame(self, width=170)
         self._custom_actions_frame.pack(side="left", fill="y", padx=10, pady=10)
 
@@ -30,52 +31,20 @@ class ActionsTab(ctk.CTkFrame):
         ctk.CTkButton(self._custom_actions_top_bar, text="–", width=28, height=24, command=self._delete_custom_action).pack(side="left", padx=2)
         CTkToolTip(self._custom_actions_top_bar, message="Delete the selected custom action")
 
-        # Recipe list frame
+        # Action list frame
         self._custom_actions_list_frame = ctk.CTkFrame(self._custom_actions_frame)
         self._custom_actions_list_frame.pack(fill="both", expand=True)
         self._custom_actions = {}
         self._selected_custom_action = None
 
-        # Left frame: actions inputs
+        # Right frame: fixed actions inputs
         self._fixed_actions_frame = ctk.CTkFrame(self)
         self._fixed_actions_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        key_actions = [
-            ("Confirm", "confirm_key", "Input the key combination for confirming actions as set in the game settings"),
-            ("Cancel", "cancel_key", "Input the key combination for cancelling actions as set in the game settings")
-        ]
-
-        self._actions_inputs = {}
-        for label, key, hint in key_actions:
-            frame = ctk.CTkFrame(self._fixed_actions_frame)
-            frame.pack(padx=20, pady=4)
-            ctk.CTkLabel(frame, text=label+" key:", width=90, anchor="w").pack(side="left")
-            entry = ctk.CTkEntry(frame, width=60)
-            entry.pack(side="left", padx=5)
-            CTkToolTip(entry, message=hint)
-            def on_key(event, e=entry):
-                if event.keysym not in ("Control_L", "Control_R", "Alt_L", "Alt_R", "Shift_L", "Shift_R") and event.keysym == event.char:
-                    e.delete(0, "end")
-                    e.insert(0, event.keysym.capitalize())
-                return "break"
-            def on_alt_key(event, e=entry):
-                e.delete(0, "end")
-                e.insert(0, "Alt+" + event.keysym.capitalize())
-                return "break"
-            def on_ctrl_key(event, e=entry):
-                e.delete(0, "end")
-                e.insert(0, "Ctrl+" + event.keysym.capitalize())
-                return "break"
-            def on_shift_key(event, e=entry):
-                e.delete(0, "end")
-                e.insert(0, "Shift+" + event.keysym.capitalize())
-                return "break"
-            entry.bind("<KeyPress>", on_key)
-            entry.bind("<Alt-KeyPress>", on_alt_key)
-            entry.bind("<Control-KeyPress>", on_ctrl_key)
-            entry.bind("<Shift-KeyPress>", on_shift_key)
-            entry.bind("<Alt-KeyRelease>", lambda e, k=key: "break")
-            self._actions_inputs[key] = entry
+        self._confirm_key_input = KeyComboWidget(self._fixed_actions_frame, "Confirm", "Input the key combination for confirming actions as set in the game settings")
+        self._confirm_key_input.pack(padx=20, pady=4)
+        self._cancel_key_input = KeyComboWidget(self._fixed_actions_frame, "Cancel", "Input the key combination for cancelling actions as set in the game settings")
+        self._cancel_key_input.pack(padx=20, pady=4)
 
     def _open_custom_action_dialog(self, dialog_type : ActionDialog):
         if dialog_type == self.ActionDialog.ADD:
