@@ -15,20 +15,20 @@ WINDOW_TITLE = "FINAL FANTASY XIV"
 
 
 class Action:
-    def __init__(self, key_combo: str, cooldown: int = 3):
+    def __init__(self, shortcut: str, duration: int = 3):
         """
         Represents an action in the crafting automation with a key combination and cooldown.
         :param key_combo: The key combination to send to the game (e.g., 'Ctrl+1', 'Alt+Q').
         :param cooldown: Cooldown in seconds after sending the key.
         """
-        self._key_combo = key_combo
-        self._cooldown = cooldown
+        self._shortcut = shortcut
+        self._duration = duration
 
     def execute(self):
         """
         Sends the key combination to the game using pyautogui, then waits for the cooldown.
         """
-        keys = self._key_combo.split('+')
+        keys = self._shortcut.split('+')
         modifiers = [k.lower() for k in keys if k.lower() in ('ctrl', 'alt', 'shift')]
         main_keys = [k for k in keys if k.lower() not in ('ctrl', 'alt', 'shift')]
         try:
@@ -38,11 +38,11 @@ class Action:
                 pyautogui.press(key)
             for mod in reversed(modifiers):
                 pyautogui.keyUp(mod)
-            print(f"[INFO] Sent key combo: {self._key_combo}")
+            print(f"[INFO] Sent key combo: {self._shortcut}")
         except Exception as e:
-            print(f"[ERROR] Failed to send key combo '{self._key_combo}': {e}")
-        print(f"[INFO] Waiting for cooldown: {self._cooldown} seconds")
-        time.sleep(self._cooldown)
+            print(f"[ERROR] Failed to send key combo '{self._shortcut}': {e}")
+        print(f"[INFO] Waiting for cooldown: {self._duration} seconds")
+        time.sleep(self._duration)
 
 class Recipe:
     def __init__(self):

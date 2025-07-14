@@ -1,15 +1,16 @@
 import customtkinter as ctk
 from CTkToolTip import *
-from enum import Enum
+from enum import StrEnum
 from collections.abc import Iterable
+from typing import Callable
 from src.common import AutoCrafterControllerInterface, ControllerState, Notification
 from .custom_widgets import KeyComboWidget
 
-class ActionsTab(ctk.CTkFrame):
+class ActionDialogType(StrEnum):
+    ADD = "Add"
+    MODIFY = "Modify"
 
-    class ActionDialog(Enum):
-        ADD = 0
-        MODIFY = 1
+class ActionsTab(ctk.CTkFrame):
 
     def __init__(self, parent, controller : AutoCrafterControllerInterface):
         super().__init__(parent)
@@ -24,7 +25,7 @@ class ActionsTab(ctk.CTkFrame):
         # Top bar for recipe actions
         self._custom_actions_top_bar = ctk.CTkFrame(self._custom_actions_frame)
         self._custom_actions_top_bar.pack(fill="x", pady=(0, 5))
-        ctk.CTkButton(self._custom_actions_top_bar, text="+", width=28, height=24, command=lambda: self._open_custom_action_dialog(self.ActionDialog.ADD)).pack(side="left", padx=2)
+        ctk.CTkButton(self._custom_actions_top_bar, text="+", width=28, height=24, command=self._create_custom_action).pack(side="left", padx=2)
         CTkToolTip(self._custom_actions_top_bar, message="Add a new custom action")
         ctk.CTkButton(self._custom_actions_top_bar, text="✎", width=28, height=24, command=self._modify_custom_action).pack(side="left", padx=2)
         CTkToolTip(self._custom_actions_top_bar, message="Modify the selected custom action")
@@ -46,69 +47,42 @@ class ActionsTab(ctk.CTkFrame):
         self._cancel_key_input = KeyComboWidget(self._fixed_actions_frame, "Cancel", "Input the key combination for cancelling actions as set in the game settings")
         self._cancel_key_input.pack(padx=20, pady=4)
 
-    def _open_custom_action_dialog(self, dialog_type : ActionDialog):
-        if dialog_type == self.ActionDialog.ADD:
-            title = "Add Custom Action"
-            label_text = "Enter action name:"
-            default_text = ""
-        elif dialog_type == self.ActionDialog.MODIFY:
-            title = "Modify Custom Action"
-            label_text = "Edit action name:"
-            default_text = self._selected_custom_action
-
-        dialog = ctk.CTkToplevel(self)
-        dialog.title(title)
-        dialog.geometry("300x160")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
-        self.update_idletasks()
-        x = self.winfo_toplevel().winfo_x() + (self.winfo_toplevel().winfo_width() // 2) - 150
-        y = self.winfo_toplevel().winfo_y() + (self.winfo_toplevel().winfo_height() // 2) - 80
-        dialog.geometry(f"300x160+{x}+{y}")
-        ctk.CTkLabel(dialog, text=label_text).pack(pady=10)
-        entry = ctk.CTkEntry(dialog, width=200)
-        entry.pack(pady=5)
-        entry.focus()
-        if default_text:
-            entry.insert(0, default_text)
-        message_label = ctk.CTkLabel(dialog, text="", text_color="red")
-        message_label.pack(pady=2)
-        btn_frame = ctk.CTkFrame(dialog)
-        btn_frame.pack(pady=10)
-
-        def confirm():
-            name = entry.get().strip()
-            if not name:
-                message_label.configure(text="Name cannot be empty.")
-                return
-            if name in self._custom_actions:
-                message_label.configure(text="An action with this name already exists.")
-                return
-            self._on_confirm_custom_action_dialog(name, dialog, dialog_type)
-        ctk.CTkButton(btn_frame, text="Confirm", command=confirm, width=80).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text="Cancel", command=dialog.destroy, width=80).pack(side="left", padx=5)
-
-    def _on_confirm_custom_action_dialog(self, name : str, dialog : ctk.CTkToplevel, dialog_type : ActionDialog):
-        if dialog_type == self.ActionDialog.ADD:
-            if self._controller.add_action(name):
-                dialog.destroy()
-        elif dialog_type == self.ActionDialog.MODIFY:
-            if self._controller.modify_action(self._selected_custom_action, name):
-                dialog.destroy()
-
     def _select_custom_action(self, name):
         self._selected_custom_action = name
         for k, v in self._custom_actions.items():
             v.configure(fg_color="#44aa77" if k == name else ctk.ThemeManager.theme["CTkButton"]["fg_color"])
 
+    def _create_custom_action(self):
+            CustomActionDialog(
+                self, 
+                ActionDialogType.ADD, 
+                self._on_confirm_custom_action_dialog, 
+                self._custom_actions.keys())
+            return "break"
+
     def _modify_custom_action(self):
-        if self._selected_custom_action is not None:
-            self._open_custom_action_dialog(self.ActionDialog.MODIFY)
+        if self._selected_custom_action is None:
+            return
+        shortcut, duration = self._controller.get_action(self._selected_custom_action)
+        CustomActionDialog(
+            self, 
+            ActionDialogType.MODIFY, 
+            self._on_confirm_custom_action_dialog, 
+            self._custom_actions.keys(),
+            selected_action=self._selected_custom_action,
+            selected_action_shortcut=shortcut,
+            selected_action_duration=duration)
+        return "break"
 
     def _delete_custom_action(self):
         if self._selected_custom_action is not None:
             self._controller.remove_action(self._selected_custom_action)
+
+    def _on_confirm_custom_action_dialog(self, name : str, dialog_type : ActionDialogType, shortcut : str, duration : int):
+        if dialog_type == ActionDialogType.ADD:
+            self._controller.add_action(name, shortcut, duration)
+        elif dialog_type == ActionDialogType.MODIFY:
+            self._controller.modify_action(self._selected_custom_action, name, shortcut, duration)
 
     def notify(self, notification_type: Notification, content: ControllerState | Iterable[str]) -> None:
         if notification_type == Notification.CONTROLLER_STATE:
@@ -129,3 +103,112 @@ class ActionsTab(ctk.CTkFrame):
                 btn.pack(pady=2, fill="x")
                 self._custom_actions[name] = btn
             self._selected_custom_action = None
+
+class CustomActionDialog(ctk.CTkToplevel):
+    """
+    Dialog for adding or modifying custom actions.
+    This is a separate class to allow for easier testing and reuse.
+    """
+    def __init__(
+            self, parent : ActionsTab, 
+            dialog_type: ActionDialogType, 
+            callback : Callable, 
+            action_list : Iterable[str], 
+            selected_action : str | None = None,
+            selected_action_shortcut: str | None = None,
+            selected_action_duration: int | None = None
+            ):
+        
+        self._parent = parent
+        self._type = dialog_type
+        self._callback = callback
+        self._selected_custom_action = selected_action
+        self._action_list = action_list
+
+        super().__init__(parent)
+        self.title(dialog_type + " custom action")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        parent.update_idletasks()
+        x = parent.winfo_toplevel().winfo_x() + (parent.winfo_toplevel().winfo_width() // 2) - 200
+        y = parent.winfo_toplevel().winfo_y() + (parent.winfo_toplevel().winfo_height() // 2) - 350
+        self.geometry(f"400x620+{x}+{y}")
+
+        # Entry and label
+        self._name_frame = ctk.CTkFrame(self)
+        self._name_frame.pack(padx=10, pady=8, anchor="w")
+        self._name_label = ctk.CTkLabel(self._name_frame, text="Action name:")
+        self._name_label.pack(padx=5, side="left")
+        self._name_entry = ctk.CTkEntry(self._name_frame, width=180)
+        self._name_entry.pack(side="left", padx=(10,8))
+        self._name_entry.focus()
+
+        # KeyComboWidget for shortcut
+        self._shortcut_frame = ctk.CTkFrame(self)
+        self._shortcut_frame.pack(padx=10, pady=2, anchor="w")
+        self._shortcut_input = KeyComboWidget(self._shortcut_frame, "Shortcut", "Input the key combination for this action")
+        self._shortcut_input.pack(side="left")
+
+        # Duration entry and label
+        self._duration_frame = ctk.CTkFrame(self)
+        self._duration_frame.pack(padx=10, pady=(10,2), anchor="w")
+        self._duration_label = ctk.CTkLabel(self._duration_frame, text="Action duration (seconds):")
+        self._duration_label.pack(padx=5, side="left")
+        self._duration_var = ctk.StringVar()
+        self._duration_entry = ctk.CTkEntry(self._duration_frame, width=80, textvariable=self._duration_var)
+        self._duration_entry.configure(validate="key", validatecommand=(self.register(lambda P : P.isdigit() or P == ""), '%P'))
+        self._duration_entry.pack(side="left", padx=(10,8))
+
+        if dialog_type == ActionDialogType.MODIFY:
+            if selected_action is not None:
+                self._name_entry.insert(0, selected_action)
+            if selected_action_shortcut is not None:
+                self._shortcut_input.set_key_combo(selected_action_shortcut)
+            if selected_action_duration is not None:
+                self._duration_var.set(str(selected_action_duration))
+
+        # Text input for macro
+        self._macro_label = ctk.CTkLabel(self, text="FF XIV Macro:")
+        self._macro_label.pack(pady=(10,2))
+        self._macro_text = ctk.CTkTextbox(self, width=360, height=245)  # 15 lines, 20px per line
+        self._macro_text.pack(pady=2)
+
+        # Limit to 15 lines like FFXIV macros
+        def limit_lines(event=None):
+            content = self._macro_text.get("1.0", "end-1c")
+            lines = content.splitlines()
+            if len(lines) > 15:
+                self._macro_text.delete("1.0", "end")
+                self._macro_text.insert("1.0", "\n".join(lines[:15]))
+        self._macro_text.bind("<KeyRelease>", limit_lines)
+
+        self._message_label = ctk.CTkLabel(self, text="", text_color="red")
+        self._message_label.pack(pady=2)
+        self._btn_frame = ctk.CTkFrame(self)
+        self._btn_frame.pack(pady=12)
+
+        ctk.CTkButton(self._btn_frame, text="Confirm", command=self._confirm, width=80).pack(side="left", padx=5)
+        ctk.CTkButton(self._btn_frame, text="Cancel", command=self.destroy, width=80).pack(side="left", padx=5)
+
+    def _confirm(self):
+        name = self._name_entry.get().strip()
+        shortcut = self._shortcut_input.get_key_combo()
+        duration = self._duration_var.get().strip()
+
+        if not name:
+            self._message_label.configure(text="Name cannot be empty.")
+            return
+        if name in self._action_list and name != self._selected_custom_action:
+            self._message_label.configure(text="An action with this name already exists.")
+            return
+        if shortcut == "":
+            self._message_label.configure(text="Shortcut cannot be empty.")
+            return
+        if not duration.isdigit():
+            self._message_label.configure(text="Duration must be an integer.")
+            return
+        
+        self._callback(name, self._type, shortcut, duration)
+        self.destroy()
+        

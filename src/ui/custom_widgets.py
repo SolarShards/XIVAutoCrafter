@@ -44,3 +44,7 @@ class KeyComboWidget(ctk.CTkFrame):
     
     def get_key_combo(self) -> str:
         return self._entry.get().strip()
+    
+    def set_key_combo(self, key_combo: str) -> None:
+        self._entry.delete(0, "end")
+        self._entry.insert(0, key_combo)

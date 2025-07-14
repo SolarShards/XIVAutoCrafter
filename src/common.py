@@ -36,15 +36,19 @@ class AutoCrafterControllerInterface(ABC):
         pass
 
     @abstractmethod
-    def add_action(self, name: str) -> bool:
+    def add_action(self, name: str, shortcut : str, duration : int) -> bool:
         pass
 
     @abstractmethod
-    def modify_action(self, current_name: str, new_name: str) -> bool:
+    def modify_action(self, current_name: str, new_name: str, shortcut : str, duration : int) -> bool:
         pass
 
     @abstractmethod
     def remove_action(self, name: str) -> bool:
+        pass
+
+    @abstractmethod
+    def get_action(self, name: str) -> tuple[str, int]:
         pass
 
     @abstractmethod
