@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import Callable
 from src.common import AutoCrafterControllerInterface, ControllerState, Notification
 from .custom_widgets import KeyComboWidget
+from src.model import Action
 
 class ActionDialogType(StrEnum):
     ADD = "Add"
@@ -63,26 +64,26 @@ class ActionsTab(ctk.CTkFrame):
     def _modify_custom_action(self):
         if self._selected_custom_action is None:
             return
-        shortcut, duration = self._controller.get_action(self._selected_custom_action)
+        action = self._controller.get_action(self._selected_custom_action)
         CustomActionDialog(
-            self, 
-            ActionDialogType.MODIFY, 
-            self._on_confirm_custom_action_dialog, 
+            self,
+            ActionDialogType.MODIFY,
+            self._on_confirm_custom_action_dialog,
             self._custom_actions.keys(),
             selected_action=self._selected_custom_action,
-            selected_action_shortcut=shortcut,
-            selected_action_duration=duration)
+            action=action
+        )
         return "break"
 
     def _delete_custom_action(self):
         if self._selected_custom_action is not None:
             self._controller.remove_action(self._selected_custom_action)
 
-    def _on_confirm_custom_action_dialog(self, name : str, dialog_type : ActionDialogType, shortcut : str, duration : int):
+    def _on_confirm_custom_action_dialog(self, name: str, dialog_type: ActionDialogType, action: Action):
         if dialog_type == ActionDialogType.ADD:
-            self._controller.add_action(name, shortcut, duration)
+            self._controller.add_action(name, action)
         elif dialog_type == ActionDialogType.MODIFY:
-            self._controller.modify_action(self._selected_custom_action, name, shortcut, duration)
+            self._controller.modify_action(self._selected_custom_action, name, action)
 
     def notify(self, notification_type: Notification, content: ControllerState | Iterable[str]) -> None:
         if notification_type == Notification.CONTROLLER_STATE:
@@ -110,20 +111,20 @@ class CustomActionDialog(ctk.CTkToplevel):
     This is a separate class to allow for easier testing and reuse.
     """
     def __init__(
-            self, parent : ActionsTab, 
-            dialog_type: ActionDialogType, 
-            callback : Callable, 
-            action_list : Iterable[str], 
-            selected_action : str | None = None,
-            selected_action_shortcut: str | None = None,
-            selected_action_duration: int | None = None
-            ):
-        
+        self,
+        parent: ActionsTab,
+        dialog_type: ActionDialogType,
+        callback: Callable,
+        action_list: Iterable[str],
+        selected_action: str | None = None,
+        action: Action = None
+    ):
         self._parent = parent
         self._type = dialog_type
         self._callback = callback
         self._selected_custom_action = selected_action
         self._action_list = action_list
+        self._action = action
 
         super().__init__(parent)
         self.title(dialog_type + " custom action")
@@ -163,10 +164,9 @@ class CustomActionDialog(ctk.CTkToplevel):
         if dialog_type == ActionDialogType.MODIFY:
             if selected_action is not None:
                 self._name_entry.insert(0, selected_action)
-            if selected_action_shortcut is not None:
-                self._shortcut_input.set_key_combo(selected_action_shortcut)
-            if selected_action_duration is not None:
-                self._duration_var.set(str(selected_action_duration))
+            if action is not None:
+                self._shortcut_input.set_key_combo(action.shortcut)
+                self._duration_var.set(str(action.duration))
 
         # Text input for macro
         self._macro_label = ctk.CTkLabel(self, text="FF XIV Macro:")
@@ -208,7 +208,7 @@ class CustomActionDialog(ctk.CTkToplevel):
         if not duration.isdigit():
             self._message_label.configure(text="Duration must be an integer.")
             return
-        
-        self._callback(name, self._type, shortcut, duration)
+
+        self._callback(name, self._type, Action(shortcut, int(duration)))
         self.destroy()
         

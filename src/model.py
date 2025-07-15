@@ -21,14 +21,14 @@ class Action:
         :param key_combo: The key combination to send to the game (e.g., 'Ctrl+1', 'Alt+Q').
         :param cooldown: Cooldown in seconds after sending the key.
         """
-        self._shortcut = shortcut
-        self._duration = duration
+        self.shortcut = shortcut
+        self.duration = duration
 
     def execute(self):
         """
         Sends the key combination to the game using pyautogui, then waits for the cooldown.
         """
-        keys = self._shortcut.split('+')
+        keys = self.shortcut.split('+')
         modifiers = [k.lower() for k in keys if k.lower() in ('ctrl', 'alt', 'shift')]
         main_keys = [k for k in keys if k.lower() not in ('ctrl', 'alt', 'shift')]
         try:
@@ -38,15 +38,19 @@ class Action:
                 pyautogui.press(key)
             for mod in reversed(modifiers):
                 pyautogui.keyUp(mod)
-            print(f"[INFO] Sent key combo: {self._shortcut}")
+            print(f"[INFO] Sent key combo: {self.shortcut}")
         except Exception as e:
-            print(f"[ERROR] Failed to send key combo '{self._shortcut}': {e}")
-        print(f"[INFO] Waiting for cooldown: {self._duration} seconds")
-        time.sleep(self._duration)
+            print(f"[ERROR] Failed to send key combo '{self.shortcut}': {e}")
+        print(f"[INFO] Waiting for cooldown: {self.duration} seconds")
+        time.sleep(self.duration)
 
 class Recipe:
-    def __init__(self):
-        pass
+    def __init__(self, actions: list[Action]):
+        self.actions = actions
+
+    def execute(self):
+        for action in self.actions:
+            action.execute()
 
 class XIVAutoCrafterModel:
     def __init__(self, lang: str = "fr"):

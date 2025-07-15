@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 import customtkinter as ctk
 from enum import StrEnum, Enum
 
+from src.model import Action, Recipe
+
 class LogSeverity(StrEnum):
     INFO = "INFO"
     ERROR = "ERROR"
@@ -24,11 +26,11 @@ class AutoCrafterControllerInterface(ABC):
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def add_recipe(self, name: str) -> bool:
+    def add_recipe(self, name: str, actions: list[Action]) -> bool:
         pass
 
     @abstractmethod
-    def modify_recipe(self, current_name: str, new_name: str) -> bool:
+    def modify_recipe(self, current_name: str, new_name: str, actions: list[Action]) -> bool:
         pass
 
     @abstractmethod
@@ -36,19 +38,31 @@ class AutoCrafterControllerInterface(ABC):
         pass
 
     @abstractmethod
-    def add_action(self, name: str, shortcut : str, duration : int) -> bool:
+    def get_recipes(self) -> dict[str, Recipe]:
         pass
 
     @abstractmethod
-    def modify_action(self, current_name: str, new_name: str, shortcut : str, duration : int) -> bool:
+    def get_recipe(self, name: str) -> Recipe | None:
+        pass
+
+    @abstractmethod
+    def add_action(self, name: str, action: Action) -> bool:
+        pass
+
+    @abstractmethod
+    def modify_action(self, current_name: str, new_name: str, action: Action) -> bool:
         pass
 
     @abstractmethod
     def remove_action(self, name: str) -> bool:
         pass
+    
+    @abstractmethod
+    def get_actions(self) -> dict[str, Action]:
+        pass
 
     @abstractmethod
-    def get_action(self, name: str) -> tuple[str, int]:
+    def get_action(self, name: str) -> Action | None:
         pass
 
     @abstractmethod
@@ -74,7 +88,7 @@ class AutoCrafterViewInterface(ctk.CTk, ABC):
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def log(self, message: str) -> None:
+    def log(self, message: str, severity: LogSeverity = LogSeverity.INFO) -> None:
         pass
 
     @abstractmethod
@@ -82,7 +96,7 @@ class AutoCrafterViewInterface(ctk.CTk, ABC):
         pass
 
     @abstractmethod
-    def notify(self, obj: ControllerState | list[str]) -> None:
+    def notify(self, notification_type: Notification, content: ControllerState | list[str]) -> None:
         pass
 
     @abstractmethod

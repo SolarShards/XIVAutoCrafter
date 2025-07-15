@@ -19,20 +19,21 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         self._thread = None
         self._state = ControllerState.STOPPED
 
-    def add_recipe(self, name: str) -> bool:
+    def add_recipe(self, name: str, actions: list[Action]) -> bool:
         if name in self._model.recipes:
             return False
-        self._model.recipes[name] = Recipe()
+        self._model.recipes[name] = Recipe(actions)
         self._view.notify(Notification.RECIPE_LIST, self._model.recipes.keys())
         return True
     
-    def modify_recipe(self, current_name: str, new_name: str) -> bool:
-        if new_name == current_name:
-            return True
-        if current_name not in self._model.recipes or new_name in self._model.recipes:
+    def modify_recipe(self, current_name: str, new_name: str, actions: list[Action]) -> bool:
+        if current_name not in self._model.recipes:
             return False
-        self._model.recipes[new_name] = self._model.recipes[current_name]
-        del self._model.recipes[current_name]
+        if new_name != current_name:
+            if new_name in self._model.recipes:
+                return False
+            del self._model.recipes[current_name]
+        self._model.recipes[new_name] = Recipe(actions)
         self._view.notify(Notification.RECIPE_LIST, self._model.recipes.keys())
         return True
 
@@ -43,20 +44,30 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         self._view.notify(Notification.RECIPE_LIST, self._model.recipes.keys())
         return True
 
-    def add_action(self, name: str, shortcut : str, duration : int) -> bool:
+    def get_recipes(self) -> dict[str, Recipe]:
+        return self._model.recipes
+
+    def get_recipe(self, name: str) -> Recipe | None:
+        return self._model.recipes.get(name, None)
+
+    def add_action(self, name: str, action: Action) -> bool:
         if name in self._model.actions:
             return False
-        self._model.actions[name] = Action(shortcut, duration)
+        self._model.actions[name] = action
         self._view.notify(Notification.ACTION_LIST, self._model.actions.keys())
         return True
     
-    def modify_action(self, current_name: str, new_name: str, shortcut : str, duration : int) -> bool:
-        if new_name == current_name:
-            self._model.actions[current_name] = Action(shortcut, duration)
-        if current_name not in self._model.actions or new_name in self._model.actions:
+    def modify_action(self, current_name: str, new_name: str, action: Action) -> bool:
+        if current_name not in self._model.actions:
             return False
-        self._model.actions[new_name] = Action(shortcut, duration)
-        del self._model.actions[current_name]
+        if new_name != current_name:
+            if new_name in self._model.actions:
+                return False
+            else:
+                self._model.actions[new_name] = action
+                del self._model.actions[current_name]            
+        else:
+            self._model.actions[current_name] = action
         self._view.notify(Notification.ACTION_LIST, self._model.actions.keys())
         return True
 
@@ -67,8 +78,11 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         self._view.notify(Notification.ACTION_LIST, self._model.actions.keys())
         return True
     
-    def get_action(self, name: str) -> tuple[str, int]:
-        return self._model.actions[name]._shortcut, self._model.actions[name]._duration if name in self._model.actions else (None, None)
+    def get_actions(self) -> dict[str, Action]:
+        return self._model.actions
+    
+    def get_action(self, name: str) -> Action | None:
+        return self._model.actions.get(name, None)
 
     def start_crafting(self, quantity: int) -> None:
         if self._state == ControllerState.STOPPED:

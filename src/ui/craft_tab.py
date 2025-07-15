@@ -3,13 +3,15 @@ from CTkToolTip import *
 from enum import Enum
 from collections.abc import Iterable
 from src.common import AutoCrafterControllerInterface, LogSeverity, ControllerState, Notification
+from src.model import Action, Recipe
 
+
+# Dialog type enum (must be outside the class)
+class RecipeDialogType(Enum):
+    ADD = 0
+    MODIFY = 1
 
 class CraftTab(ctk.CTkFrame):
-
-    class RecipeDialog(Enum):
-        ADD = 0
-        MODIFY = 1
 
     def __init__(self, parent, controller : AutoCrafterControllerInterface):
         super().__init__(parent)
@@ -39,10 +41,10 @@ class CraftTab(ctk.CTkFrame):
 
         self._top_bar = ctk.CTkFrame(self._recipe_frame)
         self._top_bar.pack(fill="x", pady=(0, 5))
-        self._add_recipe_btn = ctk.CTkButton(self._top_bar, text="+", width=28, height=24, command=lambda: self._open_recipe_dialog(self.RecipeDialog.ADD))
+        self._add_recipe_btn = ctk.CTkButton(self._top_bar, text="+", width=28, height=24, command=lambda: self._open_recipe_dialog(RecipeDialogType.ADD))
         self._add_recipe_btn.pack(side="left", padx=2)
         CTkToolTip(self._add_recipe_btn, message="Add a new recipe")
-        self._modify_recipe_btn = ctk.CTkButton(self._top_bar, text="✎", width=28, height=24, command=self._modify_recipe)
+        self._modify_recipe_btn = ctk.CTkButton(self._top_bar, text="✎", width=28, height=24, command=lambda: self._open_recipe_dialog(RecipeDialogType.MODIFY))
         self._modify_recipe_btn.pack(side="left", padx=2)
         CTkToolTip(self._modify_recipe_btn, message="Modify the selected recipe")
         self._delete_recipe_btn = ctk.CTkButton(self._top_bar, text="–", width=28, height=24, command=self._delete_recipe)
@@ -61,63 +63,27 @@ class CraftTab(ctk.CTkFrame):
         self._log_text.configure(state="disabled")
         self._log_text.pack(fill="both", expand=True)
 
-    def _open_recipe_dialog(self, dialog_type: RecipeDialog):
+    def _open_recipe_dialog(self, dialog_type: RecipeDialogType):
+        if dialog_type == RecipeDialogType.MODIFY and self._selected_recipe is None:
+            self.log("No recipe selected to modify.", LogSeverity.WARNING)
+            return
+        RecipeDialog(
+            self,
+            dialog_type,
+            self._on_confirm_recipe_dialog,
+            self._controller.get_recipes(),
+            self._controller.get_actions(),
+            selected_recipe=self._selected_recipe
+        )
 
-        if dialog_type == self.RecipeDialog.ADD:
-            title = "Add Recipe"
-            label_text = "Enter recipe name:"
-            default_text = ""
-        elif dialog_type == self.RecipeDialog.MODIFY:
-            title = "Modify Recipe"
-            label_text = "Edit recipe name:"
-            default_text = self._selected_recipe
-
-        dialog = ctk.CTkToplevel(self)
-        dialog.title(title)
-        dialog.geometry("300x160")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
-        self.update_idletasks()
-        x = self.winfo_toplevel().winfo_x() + (self.winfo_toplevel().winfo_width() // 2) - 150
-        y = self.winfo_toplevel().winfo_y() + (self.winfo_toplevel().winfo_height() // 2) - 80
-        dialog.geometry(f"300x160+{x}+{y}")
-        ctk.CTkLabel(dialog, text=label_text).pack(pady=10)
-        entry = ctk.CTkEntry(dialog, width=200)
-        entry.pack(pady=5)
-        entry.focus()
-        if default_text:
-            entry.insert(0, default_text)
-        message_label = ctk.CTkLabel(dialog, text="", text_color="red")
-        message_label.pack(pady=2)
-        btn_frame = ctk.CTkFrame(dialog)
-        btn_frame.pack(pady=10)
-
-        def confirm():
-            name = entry.get().strip()
-            if not name:
-                message_label.configure(text="Name cannot be empty.")
-                return
-            # Check for duplicate name
-            if name in self._recipes:
-                message_label.configure(text="A recipe with this name already exists.")
-                return
-            self._on_confirm_recipe_dialog(name, dialog, dialog_type)
-            
-        ctk.CTkButton(btn_frame, text="Confirm", command=confirm, width=80).pack(side="left", padx=5)
-        ctk.CTkButton(btn_frame, text="Cancel", command=dialog.destroy, width=80).pack(side="left", padx=5)
-
-    def _on_confirm_recipe_dialog(self, name : str, dialog : ctk.CTkToplevel, dialog_type: RecipeDialog):
-        if dialog_type == self.RecipeDialog.ADD:
-            if self._controller.add_recipe(name):
+    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, actions: list[Action]):
+        if dialog_type == RecipeDialogType.ADD:
+            if self._controller.add_recipe(name, actions):
                 self.log(f"Added recipe: {name}")
-                dialog.destroy()
-
-        elif dialog_type == self.RecipeDialog.MODIFY:
+        elif dialog_type == RecipeDialogType.MODIFY:
             previous_recipe_name = self._selected_recipe
-            if self._controller.modify_recipe(self._selected_recipe, name):
+            if self._controller.modify_recipe(self._selected_recipe, name, actions):
                 self.log(f"Modified recipe: {previous_recipe_name} to {name}")
-                dialog.destroy()
             else:
                 self.log(f"Failed to modify recipe: {self._selected_recipe}. It may not exist.", LogSeverity.ERROR)
 
@@ -129,7 +95,7 @@ class CraftTab(ctk.CTkFrame):
 
     def _modify_recipe(self):
         if self._selected_recipe is not None:
-            self._open_recipe_dialog(self.RecipeDialog.MODIFY)
+            self._open_recipe_dialog(RecipeDialogType.MODIFY)
         else:
             self.log("No recipe selected to modify.", LogSeverity.WARNING)
 
@@ -214,3 +180,105 @@ class CraftTab(ctk.CTkFrame):
                 self._recipes[name] = btn
             self._selected_recipe = None
             self.log("Recipe list updated.")
+
+# Dialog class for recipe add/modify
+class RecipeDialog(ctk.CTkToplevel):
+    # TODO: There is an issue with the lists in the dialog (they expand infinitely when adding actions)
+    def __init__(
+        self,
+        parent: CraftTab,
+        dialog_type: RecipeDialogType,
+        callback,
+        recipes: dict[str, Recipe],
+        actions: dict[str, Action],
+        selected_recipe: str | None = None
+    ):
+        super().__init__(parent)
+        self._type = dialog_type
+        self._callback = callback
+        self._selected_recipe = selected_recipe
+        self._recipes = recipes
+        self._actions = actions
+
+        self._recipe_actions = self._recipes.get(selected_recipe).actions if selected_recipe else []
+
+        self.title(("Add" if dialog_type == RecipeDialogType.ADD else "Modify") + " Recipe")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+        parent.update_idletasks()
+        x = parent.winfo_toplevel().winfo_x() + (parent.winfo_toplevel().winfo_width() // 2) - 250
+        y = parent.winfo_toplevel().winfo_y() + (parent.winfo_toplevel().winfo_height() // 2) - 180
+        self.geometry(f"500x500+{x}+{y}")
+
+        label_text = "Enter recipe name:" if dialog_type == RecipeDialogType.ADD else "Edit recipe name:"
+        default_text = "" if dialog_type == RecipeDialogType.ADD else selected_recipe
+
+        ctk.CTkLabel(self, text=label_text).pack(pady=10)
+        self._entry = ctk.CTkEntry(self, width=200)
+        self._entry.pack(pady=5)
+        self._entry.focus()
+        if default_text:
+            self._entry.insert(0, default_text)
+
+        # Action selection frames
+        action_frame = ctk.CTkFrame(self)
+        action_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        self._recipe_actions_frame = ctk.CTkFrame(action_frame)
+        self._recipe_actions_frame.pack(side="left", fill="both", expand=True, padx=(0,10))
+        ctk.CTkLabel(self._recipe_actions_frame, text="Recipe Actions").pack()
+        self._recipe_actions_list = ctk.CTkFrame(self._recipe_actions_frame)
+        self._recipe_actions_list.pack(fill="both", expand=True)
+
+        self._available_actions_frame = ctk.CTkFrame(action_frame)
+        self._available_actions_frame.pack(side="left", fill="both", expand=True)
+        ctk.CTkLabel(self._available_actions_frame, text="Available Actions").pack()
+        self._available_actions_list = ctk.CTkFrame(self._available_actions_frame)
+        self._available_actions_list.pack(fill="both", expand=True)
+
+        self._message_label = ctk.CTkLabel(self, text="", text_color="red")
+        self._message_label.pack(pady=2)
+        btn_frame = ctk.CTkFrame(self)
+        btn_frame.pack(pady=10)
+        ctk.CTkButton(btn_frame, text="Confirm", command=self._confirm, width=80).pack(side="left", padx=5)
+        ctk.CTkButton(btn_frame, text="Cancel", command=self.destroy, width=80).pack(side="left", padx=5)
+
+        self._refresh_action_lists()
+
+    def _refresh_action_lists(self):
+        # Clear frames
+        for widget in self._recipe_actions_list.winfo_children():
+            widget.destroy()
+        for widget in self._available_actions_list.winfo_children():
+            widget.destroy()
+        # Populate recipe actions
+        for idx, recipe_action in enumerate(self._recipe_actions):
+            for action_name, action in self._actions.items():
+                if action == recipe_action:
+                    break
+            btn = ctk.CTkButton(self._recipe_actions_list, text=action_name, width=160, command=lambda i=idx: self._remove_action_from_recipe(i))
+            btn.pack(pady=2, fill="x")
+        # Populate available actions
+        for action_name, action in self._actions.items():
+            btn = ctk.CTkButton(self._available_actions_list, text=action_name, width=160, command=lambda a=action: self._add_action_to_recipe(a))
+            btn.pack(pady=2, fill="x")
+
+    def _remove_action_from_recipe(self, idx):
+        del self._recipe_actions[idx]
+        self._refresh_action_lists()
+
+    def _add_action_to_recipe(self, action):
+        self._recipe_actions.append(action)
+        self._refresh_action_lists()
+
+    def _confirm(self):
+        name = self._entry.get().strip()
+        if not name:
+            self._message_label.configure(text="Name cannot be empty.")
+            return
+        if name in self._recipes and name != self._selected_recipe:
+            self._message_label.configure(text="A recipe with this name already exists.")
+            return
+        self._callback(name, self._type, self._recipe_actions)
+        self.destroy()
