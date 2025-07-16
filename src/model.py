@@ -1,3 +1,8 @@
+"""
+Model components for the XIV Auto Crafter application.
+Contains data classes and business logic for actions, recipes, and game automation.
+"""
+
 import win32gui
 import win32ui
 import win32con
@@ -15,16 +20,27 @@ WINDOW_TITLE = "FINAL FANTASY XIV"
 
 
 class Action:
+    """
+    Represents a single crafting action with a keyboard shortcut and execution duration.
+    Used to automate individual crafting steps in FFXIV.
+    """
+    
     def __init__(self, shortcut: str, duration: int = 3):
         """
-        Represents an action in the crafting automation with a key combination and cooldown.
-        :param key_combo: The key combination to send to the game (e.g., 'Ctrl+1', 'Alt+Q').
-        :param cooldown: Cooldown in seconds after sending the key.
+        Initialize an Action with a keyboard shortcut and duration.
+        
+        Args:
+            shortcut: The key combination to send to the game (e.g., 'Ctrl+1', 'Alt+Q')
+            duration: Cooldown in seconds after sending the key (defaults to 3)
         """
         self.shortcut = shortcut
         self.duration = duration
 
     def execute(self):
+        """
+        Execute the action by sending the key combination to the game and waiting for cooldown.
+        Handles modifier keys (Ctrl, Alt, Shift) and main keys separately for proper execution.
+        """
         """
         Sends the key combination to the game using pyautogui, then waits for the cooldown.
         """
@@ -45,17 +61,40 @@ class Action:
         time.sleep(self.duration)
 
 class Recipe:
+    """
+    Represents a crafting recipe consisting of a sequence of actions.
+    Used to automate complete crafting rotations in FFXIV.
+    """
+    
     def __init__(self, actions: list[Action]):
+        """
+        Initialize a Recipe with a list of actions to execute in sequence.
+        
+        Args:
+            actions: List of Action objects that make up the recipe
+        """
         self.actions = actions
 
     def execute(self):
+        """
+        Execute all actions in the recipe sequentially.
+        Each action will be executed with its specified cooldown before proceeding to the next.
+        """
         for action in self.actions:
             action.execute()
 
 class XIVAutoCrafterModel:
+    """
+    Main model class for the XIV Auto Crafter application.
+    Manages recipes, actions, templates, and provides game automation functionality.
+    """
+    
     def __init__(self, lang: str = "fr"):
         """
-        Initialize the model with a language and preload image templates as attributes.
+        Initialize the model with language settings and preload image templates.
+        
+        Args:
+            lang: Language code for template images (defaults to "fr")
         """
         self.lang = lang
         self.recipes = dict[str, Recipe]()
@@ -72,7 +111,12 @@ class XIVAutoCrafterModel:
     def _capture_window(self, window_title: str) -> Optional[Image.Image]:
         """
         Capture the contents of a window by its title, even if it is not in the foreground.
-        Returns a PIL Image or None if the window is not found or capture fails.
+        
+        Args:
+            window_title: The title of the window to capture
+            
+        Returns:
+            PIL Image of the window contents or None if window not found or capture fails
         """
         hwnd = win32gui.FindWindow(None, window_title)
         if not hwnd:
@@ -104,7 +148,14 @@ class XIVAutoCrafterModel:
     def _find_template_in_image(self, img: Image.Image, template_name: str, threshold: float = 0.8) -> Optional[tuple]:
         """
         Detects a preloaded template image inside another image using OpenCV template matching.
-        Returns the center (x, y) of the best match if above threshold, else None.
+        
+        Args:
+            img: The source image to search within
+            template_name: Name of the template image to search for
+            threshold: Confidence threshold for template matching (defaults to 0.8)
+            
+        Returns:
+            Tuple of (x, y) center coordinates of the best match if above threshold, else None
         """
         template = self.templates.get(template_name)
         if template is None:
@@ -123,7 +174,10 @@ class XIVAutoCrafterModel:
 
     def find_craft_window(self) -> bool:
         """
-        Searches for craft_window.png in the FINAL FANTASY XIV window and returns True if found, else False.
+        Searches for craft_window.png in the FINAL FANTASY XIV window.
+        
+        Returns:
+            True if craft window template is found, False otherwise
         """
         img = self._capture_window(WINDOW_TITLE)
         if img is None:
@@ -139,7 +193,10 @@ class XIVAutoCrafterModel:
 
     def find_craft_button(self) -> Optional[tuple]:
         """
-        Searches for craft_button.png in the FINAL FANTASY XIV window and returns the center coordinates if found, else None.
+        Searches for craft_button.png in the FINAL FANTASY XIV window.
+        
+        Returns:
+            Tuple of (x, y) center coordinates if craft button is found, None otherwise
         """
         img = self._capture_window(WINDOW_TITLE)
         if img is None:
@@ -155,7 +212,11 @@ class XIVAutoCrafterModel:
 
     def click(self, x: int, y: int) -> None:
         """
-        Double clicks with an interval of 0.3 seconds at the given coordinates in the game window.
+        Performs a double click with 0.3 second interval at the specified coordinates.
+        
+        Args:
+            x: X coordinate for the click
+            y: Y coordinate for the click
         """
         try:
             pyautogui.moveTo(x, y)
