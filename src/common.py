@@ -43,12 +43,12 @@ class AutoCrafterControllerInterface(ABC):
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def add_recipe(self, name: str, actions: list[Action]) -> bool:
+    def add_recipe(self, name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
         """Add a new recipe to the system."""
         pass
 
     @abstractmethod
-    def modify_recipe(self, current_name: str, new_name: str, actions: list[Action]) -> bool:
+    def modify_recipe(self, current_name: str, new_name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
         """Modify an existing recipe."""
         pass
 
@@ -93,7 +93,7 @@ class AutoCrafterControllerInterface(ABC):
         pass
 
     @abstractmethod
-    def start_crafting(self, quantity: int) -> None:
+    def start_crafting(self, quantity: int, recipe_name: str) -> None:
         """Start the crafting process."""
         pass
 
@@ -110,6 +110,26 @@ class AutoCrafterControllerInterface(ABC):
     @abstractmethod
     def resume_crafting(self) -> None:
         """Resume the crafting process."""
+        pass
+
+    @abstractmethod
+    def set_confirm_action(self, shortcut: str) -> None:
+        """Set the confirm action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_cancel_action(self, shortcut: str) -> None:
+        """Set the cancel action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_food_action(self, shortcut: str) -> None:
+        """Set the food action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_potion_action(self, shortcut: str) -> None:
+        """Set the potion action shortcut."""
         pass
 
 class AutoCrafterViewInterface(ctk.CTk, ABC):

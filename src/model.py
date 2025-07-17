@@ -66,14 +66,18 @@ class Recipe:
     Used to automate complete crafting rotations in FFXIV.
     """
     
-    def __init__(self, actions: list[Action]):
+    def __init__(self, actions: list[Action], use_food: bool = False, use_potion: bool = False):
         """
         Initialize a Recipe with a list of actions to execute in sequence.
         
         Args:
             actions: List of Action objects that make up the recipe
+            use_food: Whether to execute food action before the recipe (defaults to False)
+            use_potion: Whether to execute potion action before the recipe (defaults to False)
         """
         self.actions = actions
+        self.use_food = use_food
+        self.use_potion = use_potion
 
     def execute(self):
         """
@@ -100,6 +104,13 @@ class XIVAutoCrafterModel:
         self.recipes = dict[str, Recipe]()
         self.actions = dict[str, Action]()
         self.templates = dict[str, ImageFile]()
+        
+        # Fixed actions for crafting operations
+        self.confirm_action = Action("", 0)
+        self.cancel_action = Action("", 0)
+        self.food_action = Action("", 0)
+        self.potion_action = Action("", 0)
+        
         for name in ["craft_window.png", "craft_button.png"]:
             template_path = os.path.join('image_templates', lang, name)
             if os.path.exists(template_path):

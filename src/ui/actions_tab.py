@@ -11,6 +11,12 @@ class ActionDialogType(StrEnum):
     ADD = "Add"
     MODIFY = "Modify"
 
+class FixedActionType(StrEnum):
+    CONFIRM = "confirm"
+    CANCEL = "cancel"
+    FOOD = "food"
+    POTION = "potion"
+
 class ActionsTab(ctk.CTkFrame):
 
     def __init__(self, parent, controller : AutoCrafterControllerInterface):
@@ -58,6 +64,12 @@ class ActionsTab(ctk.CTkFrame):
         self._food_key_input.pack(padx=20, pady=4)
         self._potion_key_input = KeyComboWidget(self._fixed_actions_frame, "Potion", "Input the key combination for drinking a CP potion as set in the game settings")
         self._potion_key_input.pack(padx=20, pady=4)
+
+        # Bind events to detect when fixed action keys are entered
+        self._confirm_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.CONFIRM))
+        self._cancel_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.CANCEL))
+        self._food_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.FOOD))
+        self._potion_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.POTION))
 
     def _select_custom_action(self, name):
         """
@@ -135,6 +147,30 @@ class ActionsTab(ctk.CTkFrame):
                 self._custom_actions[name] = btn
             self._selected_custom_action = None
 
+    def _on_fixed_action_changed(self, action_type: FixedActionType):
+        """
+        Handle changes to fixed action key combinations and update the controller.
+        
+        Args:
+            action_type: Type of action that changed (FixedActionType enum value)
+        """
+        if action_type == FixedActionType.CONFIRM:
+            shortcut = self._confirm_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_confirm_action(shortcut)
+        elif action_type == FixedActionType.CANCEL:
+            shortcut = self._cancel_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_cancel_action(shortcut)
+        elif action_type == FixedActionType.FOOD:
+            shortcut = self._food_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_food_action(shortcut)
+        elif action_type == FixedActionType.POTION:
+            shortcut = self._potion_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_potion_action(shortcut)
+
 class CustomActionDialog(ctk.CTkToplevel):
     """
     Dialog for adding or modifying custom actions.
@@ -205,9 +241,8 @@ class CustomActionDialog(ctk.CTkToplevel):
         if dialog_type == ActionDialogType.MODIFY:
             if selected_action is not None:
                 self._name_entry.insert(0, selected_action)
-            if action is not None:
-                self._shortcut_input.set_key_combo(action.shortcut)
-                self._duration_var.set(str(action.duration))
+                self._shortcut_input.set_key_combo(action_list[selected_action].shortcut)
+                self._duration_var.set(str(action_list[selected_action].duration))
 
         # Text input for macro
         self._macro_label_frame = ctk.CTkFrame(self)

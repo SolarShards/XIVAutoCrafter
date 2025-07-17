@@ -13,9 +13,12 @@ class KeyComboWidget(ctk.CTkFrame):
         self._entry.bind("<Alt-KeyPress>", self._on_alt_key)
         self._entry.bind("<Control-KeyPress>", self._on_ctrl_key)
         self._entry.bind("<Shift-KeyPress>", self._on_shift_key)
-        self._entry.bind("<Alt-KeyRelease>", lambda e : "break")
 
     def _on_key(self, event):
+        # Don't handle if any modifier keys are pressed - let the specific modifier handlers deal with it
+        if event.state & (0x4 | 0x8 | 0x1):  # Ctrl, Alt, or Shift is pressed
+            return "break"
+        # Only handle plain keys (no modifiers)
         if event.keysym not in ("Control_L", "Control_R", "Alt_L", "Alt_R", "Shift_L", "Shift_R") and event.keysym == event.char:
             self._entry.delete(0, "end")
             self._entry.insert(0, event.keysym.capitalize())

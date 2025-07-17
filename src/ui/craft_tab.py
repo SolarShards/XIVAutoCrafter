@@ -89,7 +89,7 @@ class CraftTab(ctk.CTkFrame):
             selected_recipe=self._selected_recipe
         )
 
-    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, actions: list[Action]):
+    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, actions: list[Action], use_food: bool, use_potion: bool):
         """
         Handle confirmation from the recipe dialog by adding or modifying recipes.
         
@@ -97,13 +97,15 @@ class CraftTab(ctk.CTkFrame):
             name: Name of the recipe
             dialog_type: Type of dialog operation (ADD or MODIFY)
             actions: List of Action objects that make up the recipe
+            use_food: Whether to use food buff for this recipe
+            use_potion: Whether to use potion buff for this recipe
         """
         if dialog_type == RecipeDialogType.ADD:
-            if self._controller.add_recipe(name, actions):
+            if self._controller.add_recipe(name, actions, use_food, use_potion):
                 self.log(f"Added recipe: {name}")
         elif dialog_type == RecipeDialogType.MODIFY:
             previous_recipe_name = self._selected_recipe
-            if self._controller.modify_recipe(self._selected_recipe, name, actions):
+            if self._controller.modify_recipe(self._selected_recipe, name, actions, use_food, use_potion):
                 self.log(f"Modified recipe: {previous_recipe_name} to {name}")
             else:
                 self.log(f"Failed to modify recipe: {self._selected_recipe}. It may not exist.", LogSeverity.ERROR)
@@ -207,8 +209,8 @@ class CraftTab(ctk.CTkFrame):
             self._controller.pause_crafting()
         elif self._controller_state == ControllerState.PAUSED:
             self._controller.resume_crafting()
-        else:
-            self._controller.start_crafting(self._quantity_var.get())
+        elif self._selected_recipe is not None:
+            self._controller.start_crafting(self._quantity_var.get(), self._selected_recipe)
 
 
     def _stop_button_callback(self) -> None:
@@ -310,6 +312,25 @@ class RecipeDialog(ctk.CTkToplevel):
         if default_text:
             self._entry.insert(0, default_text)
 
+        # Food and potion checkboxes
+        checkbox_frame = ctk.CTkFrame(self)
+        checkbox_frame.pack(pady=5)
+        
+        self._use_food_var = ctk.BooleanVar()
+        self._use_potion_var = ctk.BooleanVar()
+        
+        self._use_food_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Use Food (30 min buff)", variable=self._use_food_var)
+        self._use_food_checkbox.pack(side="left", padx=10)
+        
+        self._use_potion_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Use Potion (15 min buff)", variable=self._use_potion_var)
+        self._use_potion_checkbox.pack(side="left", padx=10)
+        
+        # Set initial values if modifying an existing recipe
+        if selected_recipe and selected_recipe in self._recipes:
+            recipe = self._recipes[selected_recipe]
+            self._use_food_var.set(recipe.use_food)
+            self._use_potion_var.set(recipe.use_potion)
+
         # Action selection frames
         action_frame = ctk.CTkFrame(self)
         action_frame.pack(padx=10, pady=10, fill="both", expand=True)
@@ -379,5 +400,5 @@ class RecipeDialog(ctk.CTkToplevel):
         if name in self._recipes and name != self._selected_recipe:
             self._message_label.configure(text="A recipe with this name already exists.")
             return
-        self._callback(name, self._type, self._recipe_actions)
+        self._callback(name, self._type, self._recipe_actions, self._use_food_var.get(), self._use_potion_var.get())
         self.destroy()
