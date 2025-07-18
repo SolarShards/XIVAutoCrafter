@@ -16,6 +16,7 @@ class FixedActionType(StrEnum):
     CANCEL = "cancel"
     FOOD = "food"
     POTION = "potion"
+    RECIPE_BOOK = "recipe_book"
 
 class ActionsTab(ctk.CTkFrame):
 
@@ -64,12 +65,15 @@ class ActionsTab(ctk.CTkFrame):
         self._food_key_input.pack(padx=20, pady=4)
         self._potion_key_input = KeyComboWidget(self._fixed_actions_frame, "Potion", "Input the key combination for drinking a CP potion as set in the game settings")
         self._potion_key_input.pack(padx=20, pady=4)
+        self._recipe_book_key_input = KeyComboWidget(self._fixed_actions_frame, "Recipe Book", "Input the key combination for opening/closing the recipe book as set in the game settings")
+        self._recipe_book_key_input.pack(padx=20, pady=4)
 
         # Bind events to detect when fixed action keys are entered
         self._confirm_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.CONFIRM))
         self._cancel_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.CANCEL))
         self._food_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.FOOD))
         self._potion_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.POTION))
+        self._recipe_book_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.RECIPE_BOOK))
 
     def _select_custom_action(self, name):
         """
@@ -120,20 +124,20 @@ class ActionsTab(ctk.CTkFrame):
         elif dialog_type == ActionDialogType.MODIFY:
             self._controller.modify_action(self._selected_custom_action, name, action)
 
-    def notify(self, notification_type: Notification, content: ControllerState | Iterable[str]) -> None:
+    def notify(self, notification_type: Notification, content: ControllerState | Iterable[str] | dict[str, str]) -> None:
         """
         Handle notifications from the controller to update UI state.
         
         Args:
             notification_type: Type of notification received
-            content: Notification content (ControllerState or list of action names)
+            content: Notification content (ControllerState, list of action names, or fixed actions dict)
         """
         if notification_type == Notification.CONTROLLER_STATE:
             if not isinstance(content, ControllerState):
-                raise TypeError("Wrong notiofication type (expected ControllerState)")
+                raise TypeError("Wrong notification type (expected ControllerState)")
             self._controller_state = content
         
-        if notification_type == Notification.ACTION_LIST:
+        elif notification_type == Notification.ACTION_LIST:
             if not isinstance(content, Iterable):
                 raise TypeError("Wrong notification type (expected list of Action names)")
             # Update buttons
@@ -146,6 +150,17 @@ class ActionsTab(ctk.CTkFrame):
                 btn.pack(pady=2, fill="x")
                 self._custom_actions[name] = btn
             self._selected_custom_action = None
+        
+        elif notification_type == Notification.FIXED_ACTIONS:
+            if not isinstance(content, dict):
+                raise TypeError("Wrong notification type (expected dict of fixed actions)")
+            
+            # Update fixed action shortcuts from the dictionary
+            self._confirm_key_input.set_key_combo(content.get("confirm_action", ""))
+            self._cancel_key_input.set_key_combo(content.get("cancel_action", ""))
+            self._food_key_input.set_key_combo(content.get("food_action", ""))
+            self._potion_key_input.set_key_combo(content.get("potion_action", ""))
+            self._recipe_book_key_input.set_key_combo(content.get("recipe_book_action", ""))
 
     def _on_fixed_action_changed(self, action_type: FixedActionType):
         """
@@ -170,6 +185,10 @@ class ActionsTab(ctk.CTkFrame):
             shortcut = self._potion_key_input.get_key_combo()
             if shortcut:
                 self._controller.set_potion_action(shortcut)
+        elif action_type == FixedActionType.RECIPE_BOOK:
+            shortcut = self._recipe_book_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_recipe_book_action(shortcut)
 
 class CustomActionDialog(ctk.CTkToplevel):
     """

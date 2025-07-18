@@ -61,7 +61,7 @@ class XIVAutoCrafterView(AutoCrafterViewInterface):
         """
         self._craft_tab.log(message, severity)
 
-    def notify(self, notification_type: Notification, content: ControllerState | Iterable[str]) -> None:
+    def notify(self, notification_type: Notification, content: ControllerState | Iterable[str] | dict[str, str]) -> None:
         """
         Send notifications to all tab components.
         

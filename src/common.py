@@ -26,6 +26,7 @@ class Notification(Enum):
     CONTROLLER_STATE = "controller_state"
     RECIPE_LIST = "recipe_list"
     ACTION_LIST = "action_list"
+    FIXED_ACTIONS = "fixed_actions"
 
 class AutoCrafterControllerInterface(ABC):
     """
@@ -132,6 +133,11 @@ class AutoCrafterControllerInterface(ABC):
         """Set the potion action shortcut."""
         pass
 
+    @abstractmethod
+    def set_recipe_book_action(self, shortcut: str) -> None:
+        """Set the recipe book action shortcut."""
+        pass
+
 class AutoCrafterViewInterface(ctk.CTk, ABC):
     """
     Abstract base class defining the interface for view implementations.
@@ -158,7 +164,7 @@ class AutoCrafterViewInterface(ctk.CTk, ABC):
         pass
 
     @abstractmethod
-    def notify(self, notification_type: Notification, content: ControllerState | list[str]) -> None:
+    def notify(self, notification_type: Notification, content: ControllerState | list[str] | dict[str, str]) -> None:
         """Handle notifications from the controller."""
         pass
 

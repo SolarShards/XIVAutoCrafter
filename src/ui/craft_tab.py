@@ -86,7 +86,7 @@ class CraftTab(ctk.CTkFrame):
             self._on_confirm_recipe_dialog,
             self._controller.get_recipes(),
             self._controller.get_actions(),
-            selected_recipe=self._selected_recipe
+            selected_recipe=self._selected_recipe if dialog_type == RecipeDialogType.MODIFY else None
         )
 
     def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, actions: list[Action], use_food: bool, use_potion: bool):
@@ -222,13 +222,13 @@ class CraftTab(ctk.CTkFrame):
             return
         self._controller.stop_crafting()
 
-    def notify(self, notification_type: Notification, content: ControllerState | Iterable[str]) -> None:
+    def notify(self, notification_type: Notification, content: ControllerState | Iterable[str] | dict[str, str]) -> None:
         """
         Handle notifications from the controller to update UI state.
         
         Args:
             notification_type: Type of notification received
-            content: Notification content (ControllerState or list of recipe names)
+            content: Notification content (ControllerState, list of recipe names, or fixed actions dict)
         """
         if notification_type == Notification.CONTROLLER_STATE:
             if not isinstance(content, ControllerState):

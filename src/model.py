@@ -9,15 +9,18 @@ import win32con
 import ctypes
 import os
 import time
+import json
+from pathlib import Path
 from PIL import Image
 from PIL.ImageFile import ImageFile
 from typing import Optional
 import pyautogui
 import numpy as np
 import cv2
+from pywinauto import Application, findwindows
 
 WINDOW_TITLE = "FINAL FANTASY XIV"
-
+SAVE_LOCATION = Path(__file__).parent.parent / "data.json"
 
 class Action:
     """
@@ -38,27 +41,61 @@ class Action:
 
     def execute(self):
         """
-        Execute the action by sending the key combination to the game and waiting for cooldown.
-        Handles modifier keys (Ctrl, Alt, Shift) and main keys separately for proper execution.
+        Execute the action by sending the key combination to the FFXIV game window and waiting for cooldown.
+        Uses pywinauto to find and send keys to the FFXIV window directly.
         """
-        """
-        Sends the key combination to the game using pyautogui, then waits for the cooldown.
-        """
-        keys = self.shortcut.split('+')
-        modifiers = [k.lower() for k in keys if k.lower() in ('ctrl', 'alt', 'shift')]
-        main_keys = [k for k in keys if k.lower() not in ('ctrl', 'alt', 'shift')]
         try:
-            for mod in modifiers:
-                pyautogui.keyDown(mod)
-            for key in main_keys:
-                pyautogui.press(key)
-            for mod in reversed(modifiers):
-                pyautogui.keyUp(mod)
-            print(f"[INFO] Sent key combo: {self.shortcut}")
+            # Find all windows with FFXIV in the title
+            windows = findwindows.find_windows(title_re=".*FINAL FANTASY XIV.*")
+            if not windows:
+                print(f"[ERROR] Could not find window containing 'FINAL FANTASY XIV'")
+                return
+            
+            # Connect to the first FFXIV window found
+            app = Application().connect(handle=windows[0])
+            window = app.window(handle=windows[0])
+            
+            # Make sure the window is ready
+            if not window.exists():
+                print(f"[ERROR] FFXIV window is not accessible")
+                return
+            
+            # Send the key combination directly using pywinauto
+            print(f"[INFO] Sending key combo to FFXIV window: {self.shortcut}")
+            window.send_keystrokes(self.shortcut)
+            
+            print(f"[INFO] Successfully sent key combo: {self.shortcut}")
+            
         except Exception as e:
-            print(f"[ERROR] Failed to send key combo '{self.shortcut}': {e}")
+            print(f"[ERROR] Failed to send key combo '{self.shortcut}' to FFXIV window: {e}")
+        
         print(f"[INFO] Waiting for cooldown: {self.duration} seconds")
         time.sleep(self.duration)
+
+    def to_dict(self) -> dict:
+        """
+        Convert Action to dictionary for JSON serialization.
+        
+        Returns:
+            Dictionary representation of the Action
+        """
+        return {
+            "shortcut": self.shortcut,
+            "duration": self.duration
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Action':
+        """
+        Create Action from dictionary loaded from JSON.
+        
+        Args:
+            data: Dictionary containing action data
+            
+        Returns:
+            Action object created from the data
+        """
+        return cls(data["shortcut"], data["duration"])
 
 class Recipe:
     """
@@ -87,6 +124,59 @@ class Recipe:
         for action in self.actions:
             action.execute()
 
+    def to_dict(self, actions_dict: dict[str, 'Action']) -> dict:
+        """
+        Convert Recipe to dictionary for JSON serialization.
+        
+        Args:
+            actions_dict: Dictionary of available actions to find names by reference
+        
+        Returns:
+            Dictionary representation of the Recipe
+        """
+        action_names = []
+        for action in self.actions:
+            # Find the action name by comparing object references
+            action_name = None
+            for name, dict_action in actions_dict.items():
+                if dict_action is action:
+                    action_name = name
+                    break
+            
+            if action_name is not None:
+                action_names.append(action_name)
+            else:
+                # Fallback to shortcut if name not found
+                action_names.append(action.shortcut)
+                print(f"[WARN] Action name not found for shortcut '{action.shortcut}', using shortcut")
+        
+        return {
+            "actions": action_names,
+            "use_food": self.use_food,
+            "use_potion": self.use_potion
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, actions_dict: dict[str, 'Action']) -> 'Recipe':
+        """
+        Create Recipe from dictionary loaded from JSON.
+        
+        Args:
+            data: Dictionary containing recipe data
+            actions_dict: Dictionary of available actions to reference by name
+            
+        Returns:
+            Recipe object created from the data
+        """
+        actions = []
+        for action_name in data["actions"]:
+            if action_name in actions_dict:
+                actions.append(actions_dict[action_name])
+            else:
+                print(f"[WARN] Action '{action_name}' not found, skipping")
+        
+        return cls(actions, data["use_food"], data["use_potion"])
+
 class XIVAutoCrafterModel:
     """
     Main model class for the XIV Auto Crafter application.
@@ -110,6 +200,7 @@ class XIVAutoCrafterModel:
         self.cancel_action = Action("", 0.5)
         self.food_action = Action("", 2)
         self.potion_action = Action("", 2)
+        self.recipe_book_action = Action("", 1)
         
         for name in ["craft_window.png", "craft_button.png"]:
             template_path = os.path.join('image_templates', lang, name)
@@ -236,3 +327,82 @@ class XIVAutoCrafterModel:
             print(f"[INFO] Double click performed at ({x}, {y})")
         except Exception as e:
             print(f"[ERROR] Could not move mouse or click: {e}")
+
+    def save_data(self) -> None:
+        """
+        Save recipes and actions to JSON file.
+        """
+        try:
+            # Prepare data structure
+            data = {
+                "recipes": {name: recipe.to_dict(self.actions) for name, recipe in self.recipes.items()},
+                "actions": {name: action.to_dict() for name, action in self.actions.items()},
+                "fixed_actions": {
+                    "confirm_action": {"shortcut": self.confirm_action.shortcut},
+                    "cancel_action": {"shortcut": self.cancel_action.shortcut},
+                    "food_action": {"shortcut": self.food_action.shortcut},
+                    "potion_action": {"shortcut": self.potion_action.shortcut},
+                    "recipe_book_action": {"shortcut": self.recipe_book_action.shortcut}
+                }
+            }
+            
+            # Save to file
+            with open(SAVE_LOCATION, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            
+            print(f"[INFO] Data saved to {SAVE_LOCATION}")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to save data: {e}")
+
+    def load_data(self) -> None:
+        """
+        Load recipes and actions from JSON file.
+        Gracefully handles missing or corrupted files.
+        """
+        try:
+            if not SAVE_LOCATION.exists():
+                print(f"[INFO] No data file found at {SAVE_LOCATION}, starting with empty data")
+                return
+            
+            with open(SAVE_LOCATION, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Load actions first
+            if "actions" in data:
+                for name, action_data in data["actions"].items():
+                    try:
+                        self.actions[name] = Action.from_dict(action_data)
+                    except Exception as e:
+                        print(f"[WARN] Failed to load action '{name}': {e}")
+            
+            # Load recipes (after actions are loaded)
+            if "recipes" in data:
+                for name, recipe_data in data["recipes"].items():
+                    try:
+                        self.recipes[name] = Recipe.from_dict(recipe_data, self.actions)
+                    except Exception as e:
+                        print(f"[WARN] Failed to load recipe '{name}': {e}")
+            
+            # Load fixed actions
+            if "fixed_actions" in data:
+                fixed_actions = data["fixed_actions"]
+                try:
+                    if "confirm_action" in fixed_actions:
+                        self.confirm_action.shortcut = fixed_actions["confirm_action"]["shortcut"]
+                    if "cancel_action" in fixed_actions:
+                        self.cancel_action.shortcut = fixed_actions["cancel_action"]["shortcut"]
+                    if "food_action" in fixed_actions:
+                        self.food_action.shortcut = fixed_actions["food_action"]["shortcut"]
+                    if "potion_action" in fixed_actions:
+                        self.potion_action.shortcut = fixed_actions["potion_action"]["shortcut"]
+                    if "recipe_book_action" in fixed_actions:
+                        self.recipe_book_action.shortcut = fixed_actions["recipe_book_action"]["shortcut"]
+                except Exception as e:
+                    print(f"[WARN] Failed to load some fixed actions: {e}")
+            
+            print(f"[INFO] Loaded {len(self.recipes)} recipes and {len(self.actions)} actions from {SAVE_LOCATION}")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to load data: {e}")
+            print("[INFO] Starting with empty data")
