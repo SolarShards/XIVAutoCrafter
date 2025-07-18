@@ -40,6 +40,8 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         self._pause_event.set()
         self._thread = None
         self._state = ControllerState.STOPPED
+        self._food_time = None
+        self._potion_time = None
 
     def add_recipe(self, name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
         """
@@ -221,18 +223,6 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
                 self._state = ControllerState.RUNNING
                 self._pause_event.set()
 
-                if not self._model.find_craft_window():
-                    raise self.CraftingError("Craft window not found in the game.")
-                
-                button_center = self._model.find_craft_button()
-                if button_center is None:
-                    raise self.CraftingError("Craft button not found in the game.")
-                
-                self._model.click(*button_center)
-                self._view.log("Crafting started in the game.")
-                if self._model.find_craft_button():
-                    raise self.CraftingError("Failed to start the craft.")
-
                 if not self._thread or not self._thread.is_alive():
                     self._thread = threading.Thread(target=self._crafting_loop, daemon=True)
                     self._thread.start()
@@ -283,18 +273,19 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             return
 
         # Execute food and potion actions before starting the crafting loop
-        food_time = None
-        potion_time = None
-
-        if recipe.use_food and self._model.food_action.shortcut:
+        if recipe.use_food \
+        and (self._food_time is None or (time.time() - self._food_time) > FOOD_DURATION) \
+        and self._model.food_action.shortcut:
             self._view.log("Using food (30 minute buff)...")
+            self._food_time = time.time()
             self._model.food_action.execute()
-            food_time = time.time()
 
-        if recipe.use_potion and self._model.potion_action.shortcut:
+        if recipe.use_potion \
+        and (self._potion_time is None or (time.time() - self._potion_time) > POTION_DURATION) \
+        and self._model.potion_action.shortcut:
             self._view.log("Using potion (15 minute buff)...")
+            self._potion_time = time.time()
             self._model.potion_action.execute()
-            potion_time = time.time()
 
         # Main crafting loop
 
@@ -304,17 +295,39 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
 
             self._pause_event.wait()
 
+            able_to_start = self._model.find_craft_window() and (self._model.find_craft_button() is not None)
+            if not able_to_start:
+                self._view.log("Waiting for craft window to be ready...", severity=LogSeverity.INFO)
+                while not able_to_start:
+                    if self._state == ControllerState.STOPPED:
+                        return
+                    self._pause_event.wait(0.1)
+                    able_to_start = self._model.find_craft_window() and (self._model.find_craft_button() is not None)
+            
+            # Start craft using keyboard inputs instead of clicking
+            if self._model.confirm_action.shortcut:
+                self._model.cancel_action.execute()
+                self._model.confirm_action.execute()
+                self._view.log("Craft initiated.")
+            else:
+                raise self.CraftingError("Confirm action not configured.")
+
             # Check and reapply food buff if needed
-            if food_time is not None and (time.time() - food_time) > FOOD_DURATION and self._model.food_action.shortcut:
+            if recipe.use_food \
+            and self._food_time is not None and (time.time() - self._food_time) > FOOD_DURATION \
+            and self._model.food_action.shortcut:
+
                 self._view.log("Food buff expired. Reapplying food (30 minute buff)...")
                 self._model.food_action.execute()
-                food_time = time.time()
+                self._food_time = time.time()
 
             # Check and reapply potion buff if needed
-            if potion_time is not None and (time.time() - potion_time) > POTION_DURATION and self._model.potion_action.shortcut:
+            if recipe.use_potion \
+            and self._potion_time is not None and (time.time() - self._potion_time) > POTION_DURATION \
+            and self._model.potion_action.shortcut:
                 self._view.log("Potion buff expired. Reapplying potion (15 minute buff)...")
                 self._model.potion_action.execute()
-                potion_time = time.time()
+                self._potion_time = time.time()
 
             self._view.log(f"Crafting item {i+1}/{self._quantity}...")
 
@@ -332,7 +345,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for confirming actions
         """
-        self._model.confirm_action = Action(shortcut, 0)
+        self._model.confirm_action.shortcut = shortcut
 
     def set_cancel_action(self, shortcut: str) -> None:
         """
@@ -341,7 +354,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for cancelling actions
         """
-        self._model.cancel_action = Action(shortcut, 0)
+        self._model.cancel_action.shortcut = shortcut
 
     def set_food_action(self, shortcut: str) -> None:
         """
@@ -350,7 +363,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for consuming food
         """
-        self._model.food_action = Action(shortcut, 0)
+        self._model.food_action.shortcut = shortcut
 
     def set_potion_action(self, shortcut: str) -> None:
         """
@@ -359,4 +372,4 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for drinking a CP potion
         """
-        self._model.potion_action = Action(shortcut, 0)
+        self._model.potion_action.shortcut = shortcut

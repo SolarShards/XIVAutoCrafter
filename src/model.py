@@ -106,10 +106,10 @@ class XIVAutoCrafterModel:
         self.templates = dict[str, ImageFile]()
         
         # Fixed actions for crafting operations
-        self.confirm_action = Action("", 0)
-        self.cancel_action = Action("", 0)
-        self.food_action = Action("", 0)
-        self.potion_action = Action("", 0)
+        self.confirm_action = Action("", 1)
+        self.cancel_action = Action("", 0.5)
+        self.food_action = Action("", 2)
+        self.potion_action = Action("", 2)
         
         for name in ["craft_window.png", "craft_button.png"]:
             template_path = os.path.join('image_templates', lang, name)
