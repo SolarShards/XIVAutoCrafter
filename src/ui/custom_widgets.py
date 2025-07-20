@@ -2,6 +2,42 @@ import customtkinter as ctk
 from CTkToolTip import *
 
 class KeyComboWidget(ctk.CTkFrame):
+    # Class constant for symbol mapping
+    SYMBOL_MAP = {
+        "underscore": "_",
+        "minus": "-",
+        "equal": "=",
+        "plus": "+",
+        "bracketleft": "[",
+        "bracketright": "]",
+        "braceleft": "{",
+        "braceright": "}",
+        "semicolon": ";",
+        "colon": ":",
+        "apostrophe": "'",
+        "quotedbl": '"',
+        "comma": ",",
+        "period": ".",
+        "less": "<",
+        "greater": ">",
+        "slash": "/",
+        "question": "?",
+        "backslash": "\\",
+        "bar": "|",
+        "grave": "`",
+        "asciitilde": "~",
+        "exclam": "!",
+        "at": "@",
+        "numbersign": "#",
+        "dollar": "$",
+        "percent": "%",
+        "asciicircum": "^",
+        "ampersand": "&",
+        "asterisk": "*",
+        "parenleft": "(",
+        "parenright": ")"
+    }
+
     def __init__(self, parent, label: str, hint: str):
         super().__init__(parent)
 
@@ -29,9 +65,13 @@ class KeyComboWidget(ctk.CTkFrame):
         
         # Use the actual character for printable keys, keysym for special keys
         self._entry.delete(0, "end")
+        
         if event.char and event.char.isprintable():
             # Use the actual character for printable symbols and letters
             self._entry.insert(0, event.char)
+        elif event.keysym.lower() in self.SYMBOL_MAP:
+            # Use mapped symbol for common symbols
+            self._entry.insert(0, self.SYMBOL_MAP[event.keysym.lower()])
         else:
             # Use keysym for non-printable keys like F1, Return, etc.
             self._entry.insert(0, event.keysym.capitalize())
@@ -39,19 +79,40 @@ class KeyComboWidget(ctk.CTkFrame):
     
     def _on_alt_key(self, event):
         self._entry.delete(0, "end")
-        self._entry.insert(0, "Alt+" + event.keysym.capitalize())
+        
+        # Use symbol mapping for consistent display
+        if event.keysym.lower() in self.SYMBOL_MAP:
+            key_display = self.SYMBOL_MAP[event.keysym.lower()]
+        else:
+            key_display = event.keysym.capitalize()
+            
+        self._entry.insert(0, "Alt+" + key_display)
         self._ignore_next = True  # Ignore the next regular key press
         return "break"
     
     def _on_ctrl_key(self, event):
         self._entry.delete(0, "end")
-        self._entry.insert(0, "Ctrl+" + event.keysym.capitalize())
+        
+        # Use symbol mapping for consistent display
+        if event.keysym.lower() in self.SYMBOL_MAP:
+            key_display = self.SYMBOL_MAP[event.keysym.lower()]
+        else:
+            key_display = event.keysym.capitalize()
+            
+        self._entry.insert(0, "Ctrl+" + key_display)
         self._ignore_next = True  # Ignore the next regular key press
         return "break"
     
     def _on_shift_key(self, event):
         self._entry.delete(0, "end")
-        self._entry.insert(0, "Shift+" + event.keysym.capitalize())
+        
+        # Use symbol mapping for consistent display
+        if event.keysym.lower() in self.SYMBOL_MAP:
+            key_display = self.SYMBOL_MAP[event.keysym.lower()]
+        else:
+            key_display = event.keysym.capitalize()
+            
+        self._entry.insert(0, "Shift+" + key_display)
         self._ignore_next = True  # Ignore the next regular key press
         return "break"
     

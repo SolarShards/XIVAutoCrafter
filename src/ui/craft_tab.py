@@ -4,7 +4,7 @@ from enum import Enum
 from collections.abc import Iterable
 from src.common import AutoCrafterControllerInterface, LogSeverity, ControllerState, Notification
 from src.model import Action, Recipe
-
+from copy import deepcopy
 
 # Dialog type enum (must be outside the class)
 class RecipeDialogType(Enum):
@@ -89,23 +89,23 @@ class CraftTab(ctk.CTkFrame):
             selected_recipe=self._selected_recipe if dialog_type == RecipeDialogType.MODIFY else None
         )
 
-    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, actions: list[Action], use_food: bool, use_potion: bool):
+    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, action_names: list[str], use_food: bool, use_potion: bool):
         """
         Handle confirmation from the recipe dialog by adding or modifying recipes.
         
         Args:
             name: Name of the recipe
             dialog_type: Type of dialog operation (ADD or MODIFY)
-            actions: List of Action objects that make up the recipe
+            action_names: List of action names that make up the recipe
             use_food: Whether to use food buff for this recipe
             use_potion: Whether to use potion buff for this recipe
         """
         if dialog_type == RecipeDialogType.ADD:
-            if self._controller.add_recipe(name, actions, use_food, use_potion):
+            if self._controller.add_recipe(name, action_names, use_food, use_potion):
                 self.log(f"Added recipe: {name}")
         elif dialog_type == RecipeDialogType.MODIFY:
             previous_recipe_name = self._selected_recipe
-            if self._controller.modify_recipe(self._selected_recipe, name, actions, use_food, use_potion):
+            if self._controller.modify_recipe(self._selected_recipe, name, action_names, use_food, use_potion):
                 self.log(f"Modified recipe: {previous_recipe_name} to {name}")
             else:
                 self.log(f"Failed to modify recipe: {self._selected_recipe}. It may not exist.", LogSeverity.ERROR)
@@ -288,10 +288,8 @@ class RecipeDialog(ctk.CTkToplevel):
         self._selected_recipe = selected_recipe
         self._recipes = recipes
         self._actions = actions
-        # Build reverse mapping using action shortcut as key (since Action objects aren't reliably hashable)
-        self._reversed_action_map = {action.shortcut: name for name, action in self._actions.items()}
 
-        self._recipe_actions = self._recipes.get(selected_recipe).actions if selected_recipe else []
+        self._recipe_actions = deepcopy(self._recipes.get(selected_recipe).action_names) if selected_recipe else []
 
         self.title(("Add" if dialog_type == RecipeDialogType.ADD else "Modify") + " Recipe")
         self.resizable(False, False)
@@ -355,13 +353,19 @@ class RecipeDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_frame, text="Cancel", command=self.destroy, width=80).pack(side="left", padx=5)
 
         # Populate recipe actions
-        for idx, recipe_action in enumerate(self._recipe_actions):
-            action_name = self._reversed_action_map.get(recipe_action.shortcut, None)
-            btn = ctk.CTkButton(self._recipe_actions_list, text=action_name, width=160, command=lambda i=idx: self._remove_action_from_recipe(i))
+        for idx, action_name in enumerate(self._recipe_actions):
+            btn = ctk.CTkButton(
+                self._recipe_actions_list, 
+                text=action_name, 
+                width=160, 
+                command=lambda i=idx: self._remove_action_from_recipe(i),
+                fg_color="red" if "Deleted:" in action_name else ctk.ThemeManager.theme["CTkButton"]["fg_color"],
+                hover_color="darkred" if "Deleted:" in action_name else None
+            )
             btn.pack(pady=2, fill="x")
         # Populate available actions
-        for action_name, action in self._actions.items():
-            btn = ctk.CTkButton(self._available_actions_list, text=action_name, width=160, command=lambda n=action_name, a=action: self._add_action_to_recipe(n,a))
+        for action_name in self._actions.keys():
+            btn = ctk.CTkButton(self._available_actions_list, text=action_name, width=160, command=lambda n=action_name: self._add_action_to_recipe(n))
             btn.pack(pady=2, fill="x")
 
     def _remove_action_from_recipe(self, idx):
@@ -376,16 +380,15 @@ class RecipeDialog(ctk.CTkToplevel):
         for idx, button in enumerate(self._recipe_actions_list.winfo_children()[idx:]):
             button.configure(command=lambda i=idx: self._remove_action_from_recipe(i))
 
-    def _add_action_to_recipe(self, action_name, action):
+    def _add_action_to_recipe(self, action_name):
         """
         Add an action to the recipe and update the UI.
         
         Args:
             action_name: Display name of the action
-            action: Action object to add to the recipe
         """
         btn = ctk.CTkButton(self._recipe_actions_list, text=action_name, width=160, command=lambda i=len(self._recipe_actions): self._remove_action_from_recipe(i))
-        self._recipe_actions.append(action)
+        self._recipe_actions.append(action_name)
         btn.pack(pady=2, fill="x")
 
     def _confirm(self):
@@ -399,6 +402,9 @@ class RecipeDialog(ctk.CTkToplevel):
             return
         if name in self._recipes and name != self._selected_recipe:
             self._message_label.configure(text="A recipe with this name already exists.")
+            return
+        if "Deleted:" in "".join(self._recipe_actions):
+            self._message_label.configure(text="There are deleted actions in the recipe.\nPlease remove them before confirming.")
             return
         self._callback(name, self._type, self._recipe_actions, self._use_food_var.get(), self._use_potion_var.get())
         self.destroy()

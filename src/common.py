@@ -44,12 +44,12 @@ class AutoCrafterControllerInterface(ABC):
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def add_recipe(self, name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
+    def add_recipe(self, name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False) -> bool:
         """Add a new recipe to the system."""
         pass
 
     @abstractmethod
-    def modify_recipe(self, current_name: str, new_name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
+    def modify_recipe(self, current_name: str, new_name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False) -> bool:
         """Modify an existing recipe."""
         pass
 

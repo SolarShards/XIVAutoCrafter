@@ -377,6 +377,9 @@ class CustomActionDialog(ctk.CTkToplevel):
         if name in self._action_list and name != self._selected_custom_action:
             self._message_label.configure(text="An action with this name already exists.")
             return
+        if "Deleted:" in name:
+            self._message_label.configure(text="Name is invalid.")
+            return
         if shortcut == "":
             self._message_label.configure(text="Shortcut cannot be empty.")
             return

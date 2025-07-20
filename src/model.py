@@ -22,11 +22,83 @@ from pywinauto import Application, findwindows
 WINDOW_TITLE = "FINAL FANTASY XIV"
 SAVE_LOCATION = Path(__file__).parent.parent / "data.json"
 
+# Global Application instance for FFXIV window automation
+_ffxiv_app = None
+
+def get_ffxiv_app():
+    """
+    Get or create the global FFXIV Application instance.
+    
+    Returns:
+        pywinauto Application instance connected to FFXIV, or None if not found
+    """
+    global _ffxiv_app
+    
+    try:
+        # Check if we already have a valid connection
+        if _ffxiv_app is not None:
+            if _ffxiv_app.top_window().exists():
+                return _ffxiv_app
+            else:
+                _ffxiv_app = None
+        
+        # Find and connect to FFXIV window
+        windows = findwindows.find_windows(title_re=".*FINAL FANTASY XIV.*")
+        if not windows:
+            print(f"[ERROR] Could not find window containing 'FINAL FANTASY XIV'")
+            return None
+        
+        # Connect to the first FFXIV window found
+        _ffxiv_app = Application().connect(handle=windows[0])
+        print(f"[INFO] Connected to FFXIV window")
+        return _ffxiv_app
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to connect to FFXIV window: {e}")
+        _ffxiv_app = None
+        return None
+
 class Action:
     """
     Represents a single crafting action with a keyboard shortcut and execution duration.
     Used to automate individual crafting steps in FFXIV.
     """
+    
+    # Class constant for special character escaping in pywinauto
+    SPECIAL_CHARS = {
+        '+': '{+}',
+        '^': '{^}',
+        '%': '{%}',
+        '~': '{~}',
+        '(': '{(}',
+        ')': '{)}',
+        '[': '{[}',
+        ']': '{]}',
+        '{': '{{}',
+        '}': '{}}',
+        '"': '{"}',
+        "'": "{'}",
+        '\\': '{\\}',
+        '!': '{!}',
+        '@': '{@}',
+        '#': '{#}',
+        '$': '{$}',
+        '&': '{&}',
+        '*': '{*}',
+        '_': '{_}',
+        '=': '{=}',
+        '-': '{-}',
+        ';': '{;}',
+        ':': '{:}',
+        ',': '{,}',
+        '.': '{.}',
+        '/': '{/}',
+        '?': '{?}',
+        '|': '{|}',
+        '`': '{`}',
+        '<': '{<}',
+        '>': '{>}',
+    }
     
     def __init__(self, shortcut: str, duration: int = 3):
         """
@@ -39,30 +111,53 @@ class Action:
         self.shortcut = shortcut
         self.duration = duration
 
+    def _send_shortcut(self, key:str, shift:bool = False, alt:bool = False, ctrl:bool = False):
+
+        try: 
+            key = "{VK_NUMPAD" + key + "}" if key.isdigit() else key
+        except ValueError: 
+            pass
+        
+        # Only escape if it's not already in VK_NUMPAD format and not a function key
+        if not key.startswith('{VK_') and not key.startswith('F') and key in self.SPECIAL_CHARS:
+            key = self.SPECIAL_CHARS[key]
+        
+        if shift: key = "+" + key
+        if alt: key = "%" + key
+        if ctrl: key = "^" + key
+        
+        # Get the global FFXIV app and send keystrokes
+        app = get_ffxiv_app()
+        if app is None:
+            raise RuntimeError("Could not connect to FFXIV window")
+            
+        try:
+            window = app.window(handle=app.top_window().handle)
+            window.send_keystrokes(key)
+        except Exception as e:
+            raise RuntimeError(f"Failed to send keystroke '{key}' to FFXIV window: {e}") from e
+
     def execute(self):
         """
         Execute the action by sending the key combination to the FFXIV game window and waiting for cooldown.
-        Uses pywinauto to find and send keys to the FFXIV window directly.
+        Uses the global FFXIV Application instance for efficient window automation.
         """
-        try:
-            # Find all windows with FFXIV in the title
-            windows = findwindows.find_windows(title_re=".*FINAL FANTASY XIV.*")
-            if not windows:
-                print(f"[ERROR] Could not find window containing 'FINAL FANTASY XIV'")
-                return
-            
-            # Connect to the first FFXIV window found
-            app = Application().connect(handle=windows[0])
-            window = app.window(handle=windows[0])
-            
-            # Make sure the window is ready
-            if not window.exists():
-                print(f"[ERROR] FFXIV window is not accessible")
-                return
-            
-            # Send the key combination directly using pywinauto
+        try:            
+            # Parse the shortcut and send using _send_shortcut method
             print(f"[INFO] Sending key combo to FFXIV window: {self.shortcut}")
-            window.send_keystrokes(self.shortcut)
+            
+            keys = self.shortcut.split('+')
+            modifiers = [k.lower() for k in keys if k.lower() in ('ctrl', 'alt', 'shift')]
+            main_keys = [k for k in keys if k.lower() not in ('ctrl', 'alt', 'shift')]
+            
+            # Send each main key with the appropriate modifiers
+            for key in main_keys:
+                self._send_shortcut(
+                    key=key,
+                    shift='shift' in modifiers,
+                    alt='alt' in modifiers,
+                    ctrl='ctrl' in modifiers
+                )
             
             print(f"[INFO] Successfully sent key combo: {self.shortcut}")
             
@@ -99,83 +194,65 @@ class Action:
 
 class Recipe:
     """
-    Represents a crafting recipe consisting of a sequence of actions.
+    Represents a crafting recipe consisting of a sequence of action names.
     Used to automate complete crafting rotations in FFXIV.
     """
     
-    def __init__(self, actions: list[Action], use_food: bool = False, use_potion: bool = False):
+    def __init__(self, action_names: list[str], use_food: bool = False, use_potion: bool = False):
         """
-        Initialize a Recipe with a list of actions to execute in sequence.
+        Initialize a Recipe with a list of action names to execute in sequence.
         
         Args:
-            actions: List of Action objects that make up the recipe
+            action_names: List of action names that make up the recipe
             use_food: Whether to execute food action before the recipe (defaults to False)
             use_potion: Whether to execute potion action before the recipe (defaults to False)
         """
-        self.actions = actions
+        self.action_names = action_names
         self.use_food = use_food
         self.use_potion = use_potion
 
-    def execute(self):
+    def execute(self, actions_dict: dict[str, Action]):
         """
         Execute all actions in the recipe sequentially.
         Each action will be executed with its specified cooldown before proceeding to the next.
-        """
-        for action in self.actions:
-            action.execute()
-
-    def to_dict(self, actions_dict: dict[str, 'Action']) -> dict:
-        """
-        Convert Recipe to dictionary for JSON serialization.
         
         Args:
-            actions_dict: Dictionary of available actions to find names by reference
+            actions_dict: Dictionary of available actions to execute by name
+        """
+        for action_name in self.action_names:
+            if action_name == "Deleted action":
+                print(f"[WARN] Skipping deleted action in recipe")
+                continue
+            elif action_name in actions_dict:
+                actions_dict[action_name].execute()
+            else:
+                print(f"[WARN] Action '{action_name}' not found, skipping")
+
+    def to_dict(self) -> dict:
+        """
+        Convert Recipe to dictionary for JSON serialization.
         
         Returns:
             Dictionary representation of the Recipe
         """
-        action_names = []
-        for action in self.actions:
-            # Find the action name by comparing object references
-            action_name = None
-            for name, dict_action in actions_dict.items():
-                if dict_action is action:
-                    action_name = name
-                    break
-            
-            if action_name is not None:
-                action_names.append(action_name)
-            else:
-                # Fallback to shortcut if name not found
-                action_names.append(action.shortcut)
-                print(f"[WARN] Action name not found for shortcut '{action.shortcut}', using shortcut")
-        
         return {
-            "actions": action_names,
+            "actions": self.action_names,
             "use_food": self.use_food,
             "use_potion": self.use_potion
         }
 
     @classmethod
-    def from_dict(cls, data: dict, actions_dict: dict[str, 'Action']) -> 'Recipe':
+    def from_dict(cls, data: dict) -> 'Recipe':
         """
         Create Recipe from dictionary loaded from JSON.
         
         Args:
             data: Dictionary containing recipe data
-            actions_dict: Dictionary of available actions to reference by name
             
         Returns:
             Recipe object created from the data
         """
-        actions = []
-        for action_name in data["actions"]:
-            if action_name in actions_dict:
-                actions.append(actions_dict[action_name])
-            else:
-                print(f"[WARN] Action '{action_name}' not found, skipping")
-        
-        return cls(actions, data["use_food"], data["use_potion"])
+        return cls(data["actions"], data["use_food"], data["use_potion"])
 
 class XIVAutoCrafterModel:
     """
@@ -335,7 +412,7 @@ class XIVAutoCrafterModel:
         try:
             # Prepare data structure
             data = {
-                "recipes": {name: recipe.to_dict(self.actions) for name, recipe in self.recipes.items()},
+                "recipes": {name: recipe.to_dict() for name, recipe in self.recipes.items()},
                 "actions": {name: action.to_dict() for name, action in self.actions.items()},
                 "fixed_actions": {
                     "confirm_action": {"shortcut": self.confirm_action.shortcut},
@@ -380,7 +457,7 @@ class XIVAutoCrafterModel:
             if "recipes" in data:
                 for name, recipe_data in data["recipes"].items():
                     try:
-                        self.recipes[name] = Recipe.from_dict(recipe_data, self.actions)
+                        self.recipes[name] = Recipe.from_dict(recipe_data)
                     except Exception as e:
                         print(f"[WARN] Failed to load recipe '{name}': {e}")
             

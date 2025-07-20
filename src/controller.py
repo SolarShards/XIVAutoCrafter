@@ -57,13 +57,13 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         }
         self._view.notify(Notification.FIXED_ACTIONS, fixed_actions)
 
-    def add_recipe(self, name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
+    def add_recipe(self, name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False) -> bool:
         """
         Add a new recipe to the model.
         
         Args:
             name: Name of the recipe
-            actions: List of actions that make up the recipe
+            action_names: List of action names that make up the recipe
             use_food: Whether to use food buff for this recipe (defaults to False)
             use_potion: Whether to use potion buff for this recipe (defaults to False)
             
@@ -72,19 +72,19 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         """
         if name in self._model.recipes:
             return False
-        self._model.recipes[name] = Recipe(actions, use_food, use_potion)
+        self._model.recipes[name] = Recipe(action_names, use_food, use_potion)
         self._model.save_data()
         self._view.notify(Notification.RECIPE_LIST, self._model.recipes.keys())
         return True
     
-    def modify_recipe(self, current_name: str, new_name: str, actions: list[Action], use_food: bool = False, use_potion: bool = False) -> bool:
+    def modify_recipe(self, current_name: str, new_name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False) -> bool:
         """
         Modify an existing recipe or rename it.
         
         Args:
             current_name: Current name of the recipe
             new_name: New name for the recipe
-            actions: Updated list of actions for the recipe
+            action_names: Updated list of action names for the recipe
             use_food: Whether to use food buff for this recipe (defaults to False)
             use_potion: Whether to use potion buff for this recipe (defaults to False)
             
@@ -97,7 +97,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             if new_name in self._model.recipes:
                 return False
             del self._model.recipes[current_name]
-        self._model.recipes[new_name] = Recipe(actions, use_food, use_potion)
+        self._model.recipes[new_name] = Recipe(action_names, use_food, use_potion)
         self._model.save_data()
         self._view.notify(Notification.RECIPE_LIST, self._model.recipes.keys())
         return True
@@ -186,7 +186,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
 
     def remove_action(self, name: str) -> bool:
         """
-        Remove an action from the model and all recipes that use it.
+        Remove an action from the model and replace it with "Deleted action" in all recipes that use it.
         
         Args:
             name: Name of the action to remove
@@ -198,7 +198,10 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             return False
         action_to_delete = self._model.actions.pop(name, None)
         for recipe in self._model.recipes.values():
-            recipe.actions = [action for action in recipe.actions if action.shortcut != action_to_delete.shortcut]
+            recipe.action_names = [
+                f"Deleted: {name}" if action_name == name else action_name 
+                for action_name in recipe.action_names
+            ]
         self._model.save_data()
         self._view.notify(Notification.ACTION_LIST, self._model.actions.keys())
         return True
@@ -242,6 +245,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
                 self._selected_recipe = recipe_name  # Store for the crafting loop
                 self._state = ControllerState.RUNNING
                 self._pause_event.set()
+                self._view.notify(Notification.CONTROLLER_STATE, self._state)
 
                 if not self._thread or not self._thread.is_alive():
                     self._thread = threading.Thread(target=self._crafting_loop, daemon=True)
@@ -261,7 +265,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         if self._state in (ControllerState.RUNNING, ControllerState.PAUSED):
             self._state = ControllerState.STOPPED
             self._pause_event.set()
-            self._view.notify(Notification.CONTROLLER_STATE, ControllerState.STOPPED)
+            self._view.notify(Notification.CONTROLLER_STATE, self._state)
 
     def pause_crafting(self) -> None:
         """
@@ -270,7 +274,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         if self._state == ControllerState.RUNNING:
             self._state = ControllerState.PAUSED
             self._pause_event.clear()
-            self._view.notify(Notification.CONTROLLER_STATE, ControllerState.PAUSED)
+            self._view.notify(Notification.CONTROLLER_STATE, self._state)
 
     def resume_crafting(self) -> None:
         """
@@ -279,7 +283,54 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         if self._state == ControllerState.PAUSED:
             self._state = ControllerState.RUNNING
             self._pause_event.set()
-            self._view.notify(Notification.CONTROLLER_STATE, ControllerState.RUNNING)
+            self._view.notify(Notification.CONTROLLER_STATE, self._state)
+        
+    def _craft_init(self, from_scratch : bool = False) -> None:
+        if self._model.confirm_action.shortcut:
+            self._model.confirm_action.execute()
+            self._model.confirm_action.execute()
+            if from_scratch:
+                self._model.cancel_action.execute()
+                self._model.confirm_action.execute()
+                self._model.confirm_action.execute()
+                self._model.confirm_action.execute()
+            self._view.log("Craft initiated.")
+        else:
+            raise self.CraftingError("Confirm and/or Cancel actions not configured.")
+        
+    def _manage_buffs(self) -> bool:
+        """
+        Internal method to manage food and potion buffs during crafting.
+        Checks if buffs are active and reapplies them if necessary.
+        """
+        if not self._model.food_action.shortcut:
+            raise self.CraftingError("Food action not configured.")
+        if not self._model.potion_action.shortcut:
+            raise self.CraftingError("Potion action not configured.")
+        
+        ret = False
+        
+        # Check food buff
+        if self._food_time is None or (time.time() - self._food_time) > FOOD_DURATION:
+            if self._model.find_craft_window():
+                self._model.recipe_book_action.execute()
+                time.sleep(1)  # Allow time for the character to get up
+            self._view.log("Using food (30 minute buff)...")
+            self._food_time = time.time()
+            self._model.food_action.execute()
+            ret = True
+
+        # Check potion buff
+        if self._potion_time is None or (time.time() - self._potion_time) > POTION_DURATION:
+            if self._model.find_craft_window():
+                self._model.recipe_book_action.execute()
+                time.sleep(1)  # Allow time for the character to get up
+            self._view.log("Using potion (15 minute buff)...")
+            self._potion_time = time.time()
+            self._model.potion_action.execute()
+            ret = True
+
+        return ret
 
     def _crafting_loop(self) -> None:
         """
@@ -292,43 +343,15 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             self.stop_crafting()
             return
 
-        # Execute food and potion actions before starting the crafting loop
-        if recipe.use_food \
-        and (self._food_time is None or (time.time() - self._food_time) > FOOD_DURATION) \
-        and self._model.food_action.shortcut:
-            if self._model.find_craft_window():
-                self._model.recipe_book_action.execute()
-                time.sleep(1)  # Allow time for the recipe book to close
-            self._view.log("Using food (30 minute buff)...")
-            self._food_time = time.time()
-            self._model.food_action.execute()
-
-        if recipe.use_potion \
-        and (self._potion_time is None or (time.time() - self._potion_time) > POTION_DURATION) \
-        and self._model.potion_action.shortcut:
-            if self._model.find_craft_window():
-                self._model.recipe_book_action.execute()
-                time.sleep(1)  # Allow time for the recipe book to close
-            self._view.log("Using potion (15 minute buff)...")
-            self._potion_time = time.time()
-            self._model.potion_action.execute()
-
-        # Make sure the crafting window is ready
-        if not self._model.find_craft_window():
-            self._view.log("Trying to open the craft window...", severity=LogSeverity.INFO)
-            while not self._model.find_craft_window():
-                if self._state == ControllerState.STOPPED:
-                    return
-                self._model.recipe_book_action.execute()
-                self._pause_event.wait(1)
-
         # Main crafting loop
-
         for i in range(self._quantity):
+
             if self._state == ControllerState.STOPPED:
                 break
 
             self._pause_event.wait()
+
+            from_scratch = self._manage_buffs()
 
             if not self._model.find_craft_window():
                 self._view.log("Waiting for craft window to be ready...", severity=LogSeverity.INFO)
@@ -337,46 +360,16 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
                         return
                     self._pause_event.wait(1)
                     
-            # Start craft using keyboard inputs
-            if self._model.confirm_action.shortcut:
-                self._model.confirm_action.execute()
-                self._model.confirm_action.execute()
-                self._model.cancel_action.execute()
-                self._model.confirm_action.execute()
-                self._model.confirm_action.execute()
-                self._model.confirm_action.execute()
-                self._view.log("Craft initiated.")
-            else:
-                raise self.CraftingError("Confirm and/or Cancel actions not configured.")
-
-            # Check and reapply food buff if needed
-            if recipe.use_food \
-            and self._food_time is not None and (time.time() - self._food_time) > FOOD_DURATION \
-            and self._model.food_action.shortcut:
-                if self._model.find_craft_window():
-                    self._model.recipe_book_action.execute()
-                    time.sleep(1)  # Allow time for the recipe book to close
-                self._view.log("Food buff expired. Reapplying food (30 minute buff)...")
-                self._model.food_action.execute()
-                self._food_time = time.time()
-
-            # Check and reapply potion buff if needed
-            if recipe.use_potion \
-            and self._potion_time is not None and (time.time() - self._potion_time) > POTION_DURATION \
-            and self._model.potion_action.shortcut:
-                if self._model.find_craft_window():
-                    self._model.recipe_book_action.execute()
-                    time.sleep(1)  # Allow time for the recipe book to close
-                self._view.log("Potion buff expired. Reapplying potion (15 minute buff)...")
-                self._model.potion_action.execute()
-                self._potion_time = time.time()
+            self._craft_init(from_scratch)
 
             self._view.log(f"Crafting item {i+1}/{self._quantity}...")
 
             # Execute the recipe actions
-            recipe.execute()
+            recipe.execute(self._model.actions)
 
             self._view.set_progress((i+1)/self._quantity)
+
+            from_scratch = False
 
         self.stop_crafting()
 
