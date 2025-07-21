@@ -1,0 +1,74 @@
+XIVAutoCrafter Free Software License - NO SALE ALLOWED
+
+Copyright (c) 2025 SolarShards
+
+⚠️  THIS SOFTWARE MUST REMAIN FREE FOREVER - NO ONE MAY SELL IT ⚠️
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to use,
+copy, modify, merge, publish, and distribute the Software freely, subject to the
+following non-negotiable conditions:
+
+🚫 **ABSOLUTE PROHIBITION ON SELLING**:
+   This Software and any derivative works are PERMANENTLY FREE and may NEVER be:
+   - Sold for any price, however small
+   - Licensed for monetary compensation  
+   - Bundled with paid products or services
+   - Used to generate revenue in any form
+   - Charged for in any way whatsoever
+   - Made available only to paying customers
+
+✅ **FREE DISTRIBUTION REQUIRED**:
+   - The Software MUST be distributed free of charge
+   - No fees, subscriptions, or payments may be required for access
+   - All modifications and derivatives MUST also be free
+   - Anyone may freely share, copy, and distribute
+
+📋 **MANDATORY CONDITIONS**:
+1. **Attribution**: This copyright notice and license must be included in all copies
+2. **Share-Alike**: All modifications must use this same free license
+3. **Free Forever**: No one may ever charge money for this software
+4. **Source Availability**: Source code should remain accessible when distributed
+
+⚖️  **LEGAL ENFORCEMENT**:
+Any attempt to sell this software or charge fees for it constitutes a violation
+of this license and may result in legal action. The author reserves all rights
+to enforce the free nature of this software.
+
+🎮 **GAME COMPLIANCE**: 
+Users must ensure compliance with Final Fantasy XIV's Terms of Service.
+
+✅ **WHAT YOU CAN DO (ALL FREE)**:
+- Use the software personally
+- Share it with anyone
+- Modify and improve it
+- Create new versions
+- Distribute copies freely
+- Fork the project
+
+❌ **WHAT IS FOREVER PROHIBITED**:
+- Selling the software (NEVER ALLOWED)
+- Charging any fees or subscriptions
+- Commercial use or profit generation
+- Exclusive paid access
+- Bundling with paid products
+
+📞 **NO COMMERCIAL LICENSING AVAILABLE**:
+There is NO commercial license available. This software is designed to be
+free for everyone, forever. Commercial licensing requests will be refused.
+
+💡 **PHILOSOPHY**:
+This software was created to help the gaming community and shall remain
+a free gift to all players. Money should never be a barrier to accessing
+tools that enhance the gaming experience.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+This license is designed to keep XIVAutoCrafter free and open for the community
+while preventing commercial exploitation.

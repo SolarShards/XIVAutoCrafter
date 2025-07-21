@@ -1,0 +1,28 @@
+⚠️  XIVAutoCrafter - FREE SOFTWARE NOTICE ⚠️
+
+THIS SOFTWARE IS COMPLETELY FREE AND MUST REMAIN FREE FOREVER
+
+🚫 NO ONE MAY SELL THIS SOFTWARE 🚫
+🚫 NO ONE MAY CHARGE FEES FOR THIS SOFTWARE 🚫
+🚫 NO COMMERCIAL USE ALLOWED 🚫
+
+If someone is trying to sell you this software, they are violating the license!
+
+✅ You can freely:
+- Download and use the software
+- Share it with friends
+- Modify and improve it
+- Distribute copies (must remain free)
+
+❌ You cannot:
+- Sell it for any price
+- Charge fees for access
+- Use it commercially for profit
+- Bundle it with paid products
+
+📧 Report violations to: SolarShards (GitHub)
+
+This software was created as a gift to the FFXIV community.
+It will always be free for everyone to use and enjoy.
+
+For more details, see LICENSE.txt
