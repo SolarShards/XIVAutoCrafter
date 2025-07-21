@@ -44,12 +44,12 @@ class AutoCrafterControllerInterface(ABC):
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def add_recipe(self, name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False) -> bool:
+    def add_recipe(self, name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False, use_hq_ingredients: bool = False) -> bool:
         """Add a new recipe to the system."""
         pass
 
     @abstractmethod
-    def modify_recipe(self, current_name: str, new_name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False) -> bool:
+    def modify_recipe(self, current_name: str, new_name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False, use_hq_ingredients: bool = False) -> bool:
         """Modify an existing recipe."""
         pass
 
@@ -136,6 +136,26 @@ class AutoCrafterControllerInterface(ABC):
     @abstractmethod
     def set_recipe_book_action(self, shortcut: str) -> None:
         """Set the recipe book action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_up_action(self, shortcut: str) -> None:
+        """Set the up movement action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_down_action(self, shortcut: str) -> None:
+        """Set the down movement action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_left_action(self, shortcut: str) -> None:
+        """Set the left movement action shortcut."""
+        pass
+
+    @abstractmethod
+    def set_right_action(self, shortcut: str) -> None:
+        """Set the right movement action shortcut."""
         pass
 
 class AutoCrafterViewInterface(ctk.CTk, ABC):

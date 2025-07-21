@@ -4,7 +4,6 @@ Implements the main application window and coordinates UI components.
 """
 
 import customtkinter as ctk
-from CTkToolTip import *
 from collections.abc import Iterable
 from .ui.craft_tab import CraftTab
 from .ui.actions_tab import ActionsTab

@@ -17,6 +17,10 @@ class FixedActionType(StrEnum):
     FOOD = "food"
     POTION = "potion"
     RECIPE_BOOK = "recipe_book"
+    UP = "up"
+    DOWN = "down"
+    LEFT = "left"
+    RIGHT = "right"
 
 class ActionsTab(ctk.CTkFrame):
 
@@ -67,6 +71,14 @@ class ActionsTab(ctk.CTkFrame):
         self._potion_key_input.pack(padx=20, pady=4)
         self._recipe_book_key_input = KeyComboWidget(self._fixed_actions_frame, "Recipe Book", "Input the key combination for opening/closing the recipe book as set in the game settings")
         self._recipe_book_key_input.pack(padx=20, pady=4)
+        self._up_key_input = KeyComboWidget(self._fixed_actions_frame, "Up", "Input the key combination for moving up as set in the game settings")
+        self._up_key_input.pack(padx=20, pady=4)
+        self._down_key_input = KeyComboWidget(self._fixed_actions_frame, "Down", "Input the key combination for moving down as set in the game settings")
+        self._down_key_input.pack(padx=20, pady=4)
+        self._left_key_input = KeyComboWidget(self._fixed_actions_frame, "Left", "Input the key combination for moving left as set in the game settings")
+        self._left_key_input.pack(padx=20, pady=4)
+        self._right_key_input = KeyComboWidget(self._fixed_actions_frame, "Right", "Input the key combination for moving right as set in the game settings")
+        self._right_key_input.pack(padx=20, pady=4)
 
         # Bind events to detect when fixed action keys are entered
         self._confirm_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.CONFIRM))
@@ -74,6 +86,10 @@ class ActionsTab(ctk.CTkFrame):
         self._food_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.FOOD))
         self._potion_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.POTION))
         self._recipe_book_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.RECIPE_BOOK))
+        self._up_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.UP))
+        self._down_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.DOWN))
+        self._left_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.LEFT))
+        self._right_key_input._entry.bind("<KeyRelease>", lambda e: self._on_fixed_action_changed(FixedActionType.RIGHT))
 
     def _select_custom_action(self, name):
         """
@@ -161,6 +177,10 @@ class ActionsTab(ctk.CTkFrame):
             self._food_key_input.set_key_combo(content.get("food_action", ""))
             self._potion_key_input.set_key_combo(content.get("potion_action", ""))
             self._recipe_book_key_input.set_key_combo(content.get("recipe_book_action", ""))
+            self._up_key_input.set_key_combo(content.get("up_action", ""))
+            self._down_key_input.set_key_combo(content.get("down_action", ""))
+            self._left_key_input.set_key_combo(content.get("left_action", ""))
+            self._right_key_input.set_key_combo(content.get("right_action", ""))
 
     def _on_fixed_action_changed(self, action_type: FixedActionType):
         """
@@ -189,6 +209,22 @@ class ActionsTab(ctk.CTkFrame):
             shortcut = self._recipe_book_key_input.get_key_combo()
             if shortcut:
                 self._controller.set_recipe_book_action(shortcut)
+        elif action_type == FixedActionType.UP:
+            shortcut = self._up_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_up_action(shortcut)
+        elif action_type == FixedActionType.DOWN:
+            shortcut = self._down_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_down_action(shortcut)
+        elif action_type == FixedActionType.LEFT:
+            shortcut = self._left_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_left_action(shortcut)
+        elif action_type == FixedActionType.RIGHT:
+            shortcut = self._right_key_input.get_key_combo()
+            if shortcut:
+                self._controller.set_right_action(shortcut)
 
 class CustomActionDialog(ctk.CTkToplevel):
     """

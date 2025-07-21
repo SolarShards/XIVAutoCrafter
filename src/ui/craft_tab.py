@@ -89,7 +89,7 @@ class CraftTab(ctk.CTkFrame):
             selected_recipe=self._selected_recipe if dialog_type == RecipeDialogType.MODIFY else None
         )
 
-    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, action_names: list[str], use_food: bool, use_potion: bool):
+    def _on_confirm_recipe_dialog(self, name: str, dialog_type: RecipeDialogType, action_names: list[str], use_food: bool, use_potion: bool, use_hq_ingredients: bool):
         """
         Handle confirmation from the recipe dialog by adding or modifying recipes.
         
@@ -99,13 +99,14 @@ class CraftTab(ctk.CTkFrame):
             action_names: List of action names that make up the recipe
             use_food: Whether to use food buff for this recipe
             use_potion: Whether to use potion buff for this recipe
+            use_hq_ingredients: Whether to use HQ ingredients for this recipe
         """
         if dialog_type == RecipeDialogType.ADD:
-            if self._controller.add_recipe(name, action_names, use_food, use_potion):
+            if self._controller.add_recipe(name, action_names, use_food, use_potion, use_hq_ingredients):
                 self.log(f"Added recipe: {name}")
         elif dialog_type == RecipeDialogType.MODIFY:
             previous_recipe_name = self._selected_recipe
-            if self._controller.modify_recipe(self._selected_recipe, name, action_names, use_food, use_potion):
+            if self._controller.modify_recipe(self._selected_recipe, name, action_names, use_food, use_potion, use_hq_ingredients):
                 self.log(f"Modified recipe: {previous_recipe_name} to {name}")
             else:
                 self.log(f"Failed to modify recipe: {self._selected_recipe}. It may not exist.", LogSeverity.ERROR)
@@ -310,24 +311,37 @@ class RecipeDialog(ctk.CTkToplevel):
         if default_text:
             self._entry.insert(0, default_text)
 
-        # Food and potion checkboxes
+        # Food, potion, and HQ ingredients checkboxes
         checkbox_frame = ctk.CTkFrame(self)
         checkbox_frame.pack(pady=5)
         
         self._use_food_var = ctk.BooleanVar()
         self._use_potion_var = ctk.BooleanVar()
+        self._use_hq_ingredients_var = ctk.BooleanVar()
         
-        self._use_food_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Use Food (30 min buff)", variable=self._use_food_var)
+        # Top row: Food and Potion checkboxes
+        top_checkbox_frame = ctk.CTkFrame(checkbox_frame)
+        top_checkbox_frame.pack(pady=2)
+        
+        self._use_food_checkbox = ctk.CTkCheckBox(top_checkbox_frame, text="Use Food (30 min buff)", variable=self._use_food_var)
         self._use_food_checkbox.pack(side="left", padx=10)
         
-        self._use_potion_checkbox = ctk.CTkCheckBox(checkbox_frame, text="Use Potion (15 min buff)", variable=self._use_potion_var)
+        self._use_potion_checkbox = ctk.CTkCheckBox(top_checkbox_frame, text="Use Potion (15 min buff)", variable=self._use_potion_var)
         self._use_potion_checkbox.pack(side="left", padx=10)
+        
+        # Bottom row: HQ ingredients checkbox
+        bottom_checkbox_frame = ctk.CTkFrame(checkbox_frame)
+        bottom_checkbox_frame.pack(pady=2)
+        
+        self._use_hq_ingredients_checkbox = ctk.CTkCheckBox(bottom_checkbox_frame, text="Use HQ Ingredients", variable=self._use_hq_ingredients_var)
+        self._use_hq_ingredients_checkbox.pack()
         
         # Set initial values if modifying an existing recipe
         if selected_recipe and selected_recipe in self._recipes:
             recipe = self._recipes[selected_recipe]
             self._use_food_var.set(recipe.use_food)
             self._use_potion_var.set(recipe.use_potion)
+            self._use_hq_ingredients_var.set(getattr(recipe, 'use_hq_ingredients', False))
 
         # Action selection frames
         action_frame = ctk.CTkFrame(self)
@@ -406,5 +420,5 @@ class RecipeDialog(ctk.CTkToplevel):
         if "Deleted:" in "".join(self._recipe_actions):
             self._message_label.configure(text="There are deleted actions in the recipe.\nPlease remove them before confirming.")
             return
-        self._callback(name, self._type, self._recipe_actions, self._use_food_var.get(), self._use_potion_var.get())
+        self._callback(name, self._type, self._recipe_actions, self._use_food_var.get(), self._use_potion_var.get(), self._use_hq_ingredients_var.get())
         self.destroy()

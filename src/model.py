@@ -5,7 +5,6 @@ Contains data classes and business logic for actions, recipes, and game automati
 
 import win32gui
 import win32ui
-import win32con
 import ctypes
 import os
 import time
@@ -14,7 +13,6 @@ from pathlib import Path
 from PIL import Image
 from PIL.ImageFile import ImageFile
 from typing import Optional
-import pyautogui
 import numpy as np
 import cv2
 from pywinauto import Application, findwindows
@@ -45,16 +43,13 @@ def get_ffxiv_app():
         # Find and connect to FFXIV window
         windows = findwindows.find_windows(title_re=".*FINAL FANTASY XIV.*")
         if not windows:
-            print(f"[ERROR] Could not find window containing 'FINAL FANTASY XIV'")
             return None
         
         # Connect to the first FFXIV window found
         _ffxiv_app = Application().connect(handle=windows[0])
-        print(f"[INFO] Connected to FFXIV window")
         return _ffxiv_app
         
     except Exception as e:
-        print(f"[ERROR] Failed to connect to FFXIV window: {e}")
         _ffxiv_app = None
         return None
 
@@ -64,7 +59,8 @@ class Action:
     Used to automate individual crafting steps in FFXIV.
     """
     
-    # Class constant for special character escaping in pywinauto
+    # Comprehensive key mapping for pywinauto
+    # Special characters that need escaping
     SPECIAL_CHARS = {
         '+': '{+}',
         '^': '{^}',
@@ -100,31 +96,120 @@ class Action:
         '>': '{>}',
     }
     
+    # Function keys mapping
+    FUNCTION_KEYS = {
+        'f1': '{F1}', 'f2': '{F2}', 'f3': '{F3}', 'f4': '{F4}',
+        'f5': '{F5}', 'f6': '{F6}', 'f7': '{F7}', 'f8': '{F8}',
+        'f9': '{F9}', 'f10': '{F10}', 'f11': '{F11}', 'f12': '{F12}',
+        'f13': '{F13}', 'f14': '{F14}', 'f15': '{F15}', 'f16': '{F16}',
+        'f17': '{F17}', 'f18': '{F18}', 'f19': '{F19}', 'f20': '{F20}',
+        'f21': '{F21}', 'f22': '{F22}', 'f23': '{F23}', 'f24': '{F24}'
+    }
+    
+    # Special keys mapping
+    SPECIAL_KEYS = {
+        'enter': '{ENTER}',
+        'return': '{ENTER}',
+        'tab': '{TAB}',
+        'escape': '{ESC}',
+        'esc': '{ESC}',
+        'space': '{SPACE}',
+        'spacebar': '{SPACE}',
+        'backspace': '{BACKSPACE}',
+        'bs': '{BACKSPACE}',
+        'delete': '{DELETE}',
+        'del': '{DELETE}',
+        'insert': '{INSERT}',
+        'ins': '{INSERT}',
+        'home': '{HOME}',
+        'end': '{END}',
+        'pageup': '{PGUP}',
+        'pgup': '{PGUP}',
+        'pagedown': '{PGDN}',
+        'pgdn': '{PGDN}',
+        'up': '{UP}',
+        'down': '{DOWN}',
+        'left': '{LEFT}',
+        'right': '{RIGHT}',
+        'capslock': '{CAPSLOCK}',
+        'numlock': '{NUMLOCK}',
+        'scrolllock': '{SCROLLLOCK}',
+        'printscreen': '{PRTSC}',
+        'prtsc': '{PRTSC}',
+        'pause': '{PAUSE}',
+        'break': '{BREAK}',
+        'menu': '{APPS}',
+        'apps': '{APPS}',
+        'win': '{LWIN}',
+        'windows': '{LWIN}',
+        'lwin': '{LWIN}',
+        'rwin': '{RWIN}'
+    }
+    
+    # Numpad keys mapping
+    NUMPAD_KEYS = {
+        'numpad0': '{VK_NUMPAD0}', 'num0': '{VK_NUMPAD0}',
+        'numpad1': '{VK_NUMPAD1}', 'num1': '{VK_NUMPAD1}',
+        'numpad2': '{VK_NUMPAD2}', 'num2': '{VK_NUMPAD2}',
+        'numpad3': '{VK_NUMPAD3}', 'num3': '{VK_NUMPAD3}',
+        'numpad4': '{VK_NUMPAD4}', 'num4': '{VK_NUMPAD4}',
+        'numpad5': '{VK_NUMPAD5}', 'num5': '{VK_NUMPAD5}',
+        'numpad6': '{VK_NUMPAD6}', 'num6': '{VK_NUMPAD6}',
+        'numpad7': '{VK_NUMPAD7}', 'num7': '{VK_NUMPAD7}',
+        'numpad8': '{VK_NUMPAD8}', 'num8': '{VK_NUMPAD8}',
+        'numpad9': '{VK_NUMPAD9}', 'num9': '{VK_NUMPAD9}',
+        'numpadmultiply': '{VK_MULTIPLY}', 'num*': '{VK_MULTIPLY}',
+        'numpadadd': '{VK_ADD}', 'num+': '{VK_ADD}',
+        'numpadsubtract': '{VK_SUBTRACT}', 'num-': '{VK_SUBTRACT}',
+        'numpaddecimal': '{VK_DECIMAL}', 'num.': '{VK_DECIMAL}',
+        'numpaddivide': '{VK_DIVIDE}', 'num/': '{VK_DIVIDE}',
+        'numpadenter': '{VK_RETURN}'
+    }
+    
     def __init__(self, shortcut: str, duration: int = 3):
         """
         Initialize an Action with a keyboard shortcut and duration.
         
         Args:
-            shortcut: The key combination to send to the game (e.g., 'Ctrl+1', 'Alt+Q')
+            shortcut: The key combination to send to the game (e.g., 'Ctrl+F1', 'Alt+Q')
             duration: Cooldown in seconds after sending the key (defaults to 3)
         """
         self.shortcut = shortcut
         self.duration = duration
 
-    def _send_shortcut(self, key:str, shift:bool = False, alt:bool = False, ctrl:bool = False):
-
-        try: 
-            key = "{VK_NUMPAD" + key + "}" if key.isdigit() else key
-        except ValueError: 
-            pass
+    def _send_shortcut(self, key: str, shift: bool = False, alt: bool = False, ctrl: bool = False):
+        """
+        Send a single key with optional modifiers to the FFXIV window.
         
-        # Only escape if it's not already in VK_NUMPAD format and not a function key
-        if not key.startswith('{VK_') and not key.startswith('F') and key in self.SPECIAL_CHARS:
-            key = self.SPECIAL_CHARS[key]
+        Args:
+            key: The key to send
+            shift: Whether to hold Shift modifier
+            alt: Whether to hold Alt modifier  
+            ctrl: Whether to hold Ctrl modifier
+        """
+        key_lower = key.lower().strip()
         
-        if shift: key = "+" + key
-        if alt: key = "%" + key
-        if ctrl: key = "^" + key
+        # Convert key to proper pywinauto format
+        if key_lower in self.FUNCTION_KEYS:
+            converted_key = self.FUNCTION_KEYS[key_lower]
+        elif key_lower in self.SPECIAL_KEYS:
+            converted_key = self.SPECIAL_KEYS[key_lower]
+        elif key_lower in self.NUMPAD_KEYS:
+            converted_key = self.NUMPAD_KEYS[key_lower]
+        elif key.isdigit() and len(key) == 1:
+            converted_key = f"{{VK_NUMPAD{key}}}"
+        elif key in self.SPECIAL_CHARS:
+            converted_key = self.SPECIAL_CHARS[key]
+        else:
+            converted_key = key
+        
+        # Apply modifiers
+        if shift:
+            converted_key = "+" + converted_key
+        if alt:
+            converted_key = "%" + converted_key
+        if ctrl:
+            converted_key = "^" + converted_key
         
         # Get the global FFXIV app and send keystrokes
         app = get_ffxiv_app()
@@ -133,9 +218,9 @@ class Action:
             
         try:
             window = app.window(handle=app.top_window().handle)
-            window.send_keystrokes(key)
+            window.send_keystrokes(converted_key)
         except Exception as e:
-            raise RuntimeError(f"Failed to send keystroke '{key}' to FFXIV window: {e}") from e
+            raise RuntimeError(f"Failed to send keystroke '{converted_key}' to FFXIV window: {e}") from e
 
     def execute(self):
         """
@@ -144,28 +229,35 @@ class Action:
         """
         try:            
             # Parse the shortcut and send using _send_shortcut method
-            print(f"[INFO] Sending key combo to FFXIV window: {self.shortcut}")
             
-            keys = self.shortcut.split('+')
+            # Split shortcut into components
+            keys = [k.strip() for k in self.shortcut.split('+')]
             modifiers = [k.lower() for k in keys if k.lower() in ('ctrl', 'alt', 'shift')]
             main_keys = [k for k in keys if k.lower() not in ('ctrl', 'alt', 'shift')]
             
+            # Validate that we have main keys to send
+            if not main_keys:
+                return
+            
             # Send each main key with the appropriate modifiers
             for key in main_keys:
-                self._send_shortcut(
-                    key=key,
-                    shift='shift' in modifiers,
-                    alt='alt' in modifiers,
-                    ctrl='ctrl' in modifiers
-                )
-            
-            print(f"[INFO] Successfully sent key combo: {self.shortcut}")
+                try:
+                    self._send_shortcut(
+                        key=key,
+                        shift='shift' in modifiers,
+                        alt='alt' in modifiers,
+                        ctrl='ctrl' in modifiers
+                    )
+                except Exception as e:
+                    # Continue with other keys rather than failing completely
+                    continue
             
         except Exception as e:
-            print(f"[ERROR] Failed to send key combo '{self.shortcut}' to FFXIV window: {e}")
+            pass
         
-        print(f"[INFO] Waiting for cooldown: {self.duration} seconds")
-        time.sleep(self.duration)
+        # Always wait for cooldown, even if sending keys failed
+        if self.duration > 0:
+            time.sleep(self.duration)
 
     def to_dict(self) -> dict:
         """
@@ -198,7 +290,7 @@ class Recipe:
     Used to automate complete crafting rotations in FFXIV.
     """
     
-    def __init__(self, action_names: list[str], use_food: bool = False, use_potion: bool = False):
+    def __init__(self, action_names: list[str], use_food: bool = False, use_potion: bool = False, use_hq_ingredients: bool = False):
         """
         Initialize a Recipe with a list of action names to execute in sequence.
         
@@ -206,10 +298,12 @@ class Recipe:
             action_names: List of action names that make up the recipe
             use_food: Whether to execute food action before the recipe (defaults to False)
             use_potion: Whether to execute potion action before the recipe (defaults to False)
+            use_hq_ingredients: Whether to use HQ ingredients for the recipe (defaults to False)
         """
         self.action_names = action_names
         self.use_food = use_food
         self.use_potion = use_potion
+        self.use_hq_ingredients = use_hq_ingredients
 
     def execute(self, actions_dict: dict[str, Action]):
         """
@@ -221,12 +315,11 @@ class Recipe:
         """
         for action_name in self.action_names:
             if action_name == "Deleted action":
-                print(f"[WARN] Skipping deleted action in recipe")
                 continue
             elif action_name in actions_dict:
                 actions_dict[action_name].execute()
             else:
-                print(f"[WARN] Action '{action_name}' not found, skipping")
+                pass
 
     def to_dict(self) -> dict:
         """
@@ -238,7 +331,8 @@ class Recipe:
         return {
             "actions": self.action_names,
             "use_food": self.use_food,
-            "use_potion": self.use_potion
+            "use_potion": self.use_potion,
+            "use_hq_ingredients": self.use_hq_ingredients
         }
 
     @classmethod
@@ -252,7 +346,7 @@ class Recipe:
         Returns:
             Recipe object created from the data
         """
-        return cls(data["actions"], data["use_food"], data["use_potion"])
+        return cls(data["actions"], data.get("use_food", False), data.get("use_potion", False), data.get("use_hq_ingredients", False))
 
 class XIVAutoCrafterModel:
     """
@@ -273,19 +367,22 @@ class XIVAutoCrafterModel:
         self.templates = dict[str, ImageFile]()
         
         # Fixed actions for crafting operations
-        self.confirm_action = Action("", 1)
+        self.confirm_action = Action("", 0.5)
         self.cancel_action = Action("", 0.5)
         self.food_action = Action("", 2)
         self.potion_action = Action("", 2)
         self.recipe_book_action = Action("", 1)
-        
+        self.up_action = Action("", 0.5)
+        self.down_action = Action("", 0.5)
+        self.left_action = Action("", 0.5)
+        self.right_action = Action("", 0.5)
+
         for name in ["craft_window.png", "craft_button.png"]:
             template_path = os.path.join('image_templates', lang, name)
             if os.path.exists(template_path):
                 self.templates[name] = Image.open(template_path)
             else:
                 self.templates[name] = None
-                print(f"[WARN] Template not found: {template_path}")
 
     def _capture_window(self, window_title: str) -> Optional[Image.Image]:
         """
@@ -338,7 +435,6 @@ class XIVAutoCrafterModel:
         """
         template = self.templates.get(template_name)
         if template is None:
-            print(f"[ERROR] Template '{template_name}' not loaded.")
             return None
         img_cv = np.array(img.convert('RGB'))
         template_cv = np.array(template.convert('RGB'))
@@ -360,14 +456,11 @@ class XIVAutoCrafterModel:
         """
         img = self._capture_window(WINDOW_TITLE)
         if img is None:
-            print(f"[ERROR] Could not capture window '{WINDOW_TITLE}'.")
             return False
         window_center = self._find_template_in_image(img, "craft_window.png")
         if window_center:
-            print(f"[INFO] 'craft_window.png' found at {window_center}")
             return True
         else:
-            print("[INFO] 'craft_window.png' NOT found in the image.")
             return False
 
     def find_craft_button(self) -> Optional[tuple]:
@@ -379,31 +472,12 @@ class XIVAutoCrafterModel:
         """
         img = self._capture_window(WINDOW_TITLE)
         if img is None:
-            print(f"[ERROR] Could not capture window '{WINDOW_TITLE}'.")
             return None
         button_center = self._find_template_in_image(img, "craft_button.png")
         if button_center:
-            print(f"[INFO] 'craft_button.png' found at {button_center}")
             return button_center
         else:
-            print("[INFO] 'craft_button.png' NOT found in the image.")
             return None
-
-    def click(self, x: int, y: int) -> None:
-        """
-        Performs a double click with 0.3 second interval at the specified coordinates.
-        
-        Args:
-            x: X coordinate for the click
-            y: Y coordinate for the click
-        """
-        try:
-            pyautogui.moveTo(x, y)
-            print(f"[INFO] Cursor moved to ({x}, {y})")
-            pyautogui.click(clicks=2, interval=0.3)
-            print(f"[INFO] Double click performed at ({x}, {y})")
-        except Exception as e:
-            print(f"[ERROR] Could not move mouse or click: {e}")
 
     def save_data(self) -> None:
         """
@@ -419,7 +493,11 @@ class XIVAutoCrafterModel:
                     "cancel_action": {"shortcut": self.cancel_action.shortcut},
                     "food_action": {"shortcut": self.food_action.shortcut},
                     "potion_action": {"shortcut": self.potion_action.shortcut},
-                    "recipe_book_action": {"shortcut": self.recipe_book_action.shortcut}
+                    "recipe_book_action": {"shortcut": self.recipe_book_action.shortcut},
+                    "up_action": {"shortcut": self.up_action.shortcut},
+                    "down_action": {"shortcut": self.down_action.shortcut},
+                    "left_action": {"shortcut": self.left_action.shortcut},
+                    "right_action": {"shortcut": self.right_action.shortcut}
                 }
             }
             
@@ -427,10 +505,8 @@ class XIVAutoCrafterModel:
             with open(SAVE_LOCATION, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             
-            print(f"[INFO] Data saved to {SAVE_LOCATION}")
-            
         except Exception as e:
-            print(f"[ERROR] Failed to save data: {e}")
+            pass
 
     def load_data(self) -> None:
         """
@@ -439,7 +515,6 @@ class XIVAutoCrafterModel:
         """
         try:
             if not SAVE_LOCATION.exists():
-                print(f"[INFO] No data file found at {SAVE_LOCATION}, starting with empty data")
                 return
             
             with open(SAVE_LOCATION, 'r', encoding='utf-8') as f:
@@ -451,7 +526,7 @@ class XIVAutoCrafterModel:
                     try:
                         self.actions[name] = Action.from_dict(action_data)
                     except Exception as e:
-                        print(f"[WARN] Failed to load action '{name}': {e}")
+                        pass
             
             # Load recipes (after actions are loaded)
             if "recipes" in data:
@@ -459,7 +534,7 @@ class XIVAutoCrafterModel:
                     try:
                         self.recipes[name] = Recipe.from_dict(recipe_data)
                     except Exception as e:
-                        print(f"[WARN] Failed to load recipe '{name}': {e}")
+                        pass
             
             # Load fixed actions
             if "fixed_actions" in data:
@@ -475,11 +550,16 @@ class XIVAutoCrafterModel:
                         self.potion_action.shortcut = fixed_actions["potion_action"]["shortcut"]
                     if "recipe_book_action" in fixed_actions:
                         self.recipe_book_action.shortcut = fixed_actions["recipe_book_action"]["shortcut"]
+                    if "up_action" in fixed_actions:
+                        self.up_action.shortcut = fixed_actions["up_action"]["shortcut"]
+                    if "down_action" in fixed_actions:
+                        self.down_action.shortcut = fixed_actions["down_action"]["shortcut"]
+                    if "left_action" in fixed_actions:
+                        self.left_action.shortcut = fixed_actions["left_action"]["shortcut"]
+                    if "right_action" in fixed_actions:
+                        self.right_action.shortcut = fixed_actions["right_action"]["shortcut"]
                 except Exception as e:
-                    print(f"[WARN] Failed to load some fixed actions: {e}")
-            
-            print(f"[INFO] Loaded {len(self.recipes)} recipes and {len(self.actions)} actions from {SAVE_LOCATION}")
+                    pass
             
         except Exception as e:
-            print(f"[ERROR] Failed to load data: {e}")
-            print("[INFO] Starting with empty data")
+            pass
