@@ -7,6 +7,7 @@ import win32gui
 import win32ui
 import ctypes
 import os
+import sys
 import time
 import json
 from pathlib import Path
@@ -18,7 +19,16 @@ import cv2
 from pywinauto import Application, findwindows
 
 WINDOW_TITLE = "FINAL FANTASY XIV"
-SAVE_LOCATION = Path(__file__).parent.parent / "data.json"
+
+# Determine the correct location for data.json
+# When running as a PyInstaller executable, use the executable's directory
+# When running as a script, use the parent directory of the script
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller executable
+    SAVE_LOCATION = Path(sys.executable).parent / "data.json"
+else:
+    # Running as script
+    SAVE_LOCATION = Path(__file__).parent.parent / "data.json"
 
 # Global Application instance for FFXIV window automation
 _ffxiv_app = None
@@ -366,6 +376,14 @@ class XIVAutoCrafterModel:
         self.actions = dict[str, Action]()
         self.templates = dict[str, ImageFile]()
         
+        # Determine the correct base path for templates
+        if getattr(sys, 'frozen', False):
+            # Running as PyInstaller executable
+            base_path = Path(sys.executable).parent
+        else:
+            # Running as script
+            base_path = Path(__file__).parent.parent
+        
         # Fixed actions for crafting operations
         self.confirm_action = Action("", 0.5)
         self.cancel_action = Action("", 0.5)
@@ -378,8 +396,8 @@ class XIVAutoCrafterModel:
         self.right_action = Action("", 0.5)
 
         for name in ["craft_window.png", "craft_button.png"]:
-            template_path = os.path.join('image_templates', lang, name)
-            if os.path.exists(template_path):
+            template_path = base_path / 'image_templates' / lang / name
+            if template_path.exists():
                 self.templates[name] = Image.open(template_path)
             else:
                 self.templates[name] = None
