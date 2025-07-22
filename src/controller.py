@@ -385,12 +385,10 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             self._view.log(f"Crafting item {i+1}/{self._quantity}...")
 
             # Execute the recipe actions
-            time.sleep(1)  # Allow time for the character to sit down
+            self._pause_event.wait(1)  # Allow time for the character to sit down
             recipe.execute(self._model.actions)
 
             self._view.set_progress((i+1)/self._quantity)
-
-            from_scratch = False
 
         self.stop_crafting()
 
