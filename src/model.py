@@ -368,34 +368,42 @@ class XIVAutoCrafterModel:
         self.actions = dict[str, Action]()
         
         # Fixed actions for crafting operations
-        self.confirm_action = Action("", 0.5)
-        self.cancel_action = Action("", 0.5)
-        self.food_action = Action("", 2)
-        self.potion_action = Action("", 2)
-        self.recipe_book_action = Action("", 1)
-        self.up_action = Action("", 0.5)
-        self.down_action = Action("", 0.5)
-        self.left_action = Action("", 0.5)
-        self.right_action = Action("", 0.5)
+        self.confirm_f_action = Action("", 0.5)
+        self.cancel_f_action = Action("", 0.5)
+        self.food_f_action = Action("", 2)
+        self.potion_f_action = Action("", 2)
+        self.recipe_book_f_action = Action("", 1)
+        self.up_f_action = Action("", 0.5)
+        self.down_f_action = Action("", 0.5)
+        self.left_f_action = Action("", 0.5)
+        self.right_f_action = Action("", 0.5)
 
         self._crafting_log_text = None
 
         self._ocr_reader = screen_ocr.Reader.create_quality_reader()
 
     def find_craft_window(self) -> bool:
-        hwnd = win32gui.FindWindow(None, WINDOW_TITLE)
-        window_rect = win32gui.GetWindowRect(hwnd)
-        result = self._ocr_reader.read_screen(window_rect)
+        try:
+            hwnd = win32gui.FindWindow(None, WINDOW_TITLE)
+            if not hwnd:
+                return False
+                
+            window_rect = win32gui.GetWindowRect(hwnd)
+            result = self._ocr_reader.read_screen(window_rect)
 
-        if self._crafting_log_text is not None:
-            if len(result.find_matching_words(self._crafting_log_text)) > 0:
-                return True
-        else:
-            for text in CRAFTING_LOG_TITLES:
-                if len(result.find_matching_words(text)) > 0:
-                    self._crafting_log_text = text
+            if self._crafting_log_text is not None:
+                matches = result.find_matching_words(self._crafting_log_text)
+                if matches and len(matches) > 0:
                     return True
-        return False
+            else:
+                for text in CRAFTING_LOG_TITLES:
+                    matches = result.find_matching_words(text)
+                    if matches and len(matches) > 0:
+                        self._crafting_log_text = text
+                        return True
+            return False
+        except Exception:
+            return False
         
 
     def save_data(self) -> None:
@@ -403,21 +411,12 @@ class XIVAutoCrafterModel:
         Save recipes and actions to JSON file.
         """
         try:
+            fixed_actions_vars = vars(self)
             # Prepare data structure
             data = {
                 "recipes": {name: recipe.to_dict() for name, recipe in self.recipes.items()},
                 "actions": {name: action.to_dict() for name, action in self.actions.items()},
-                "fixed_actions": {
-                    "confirm_action": {"shortcut": self.confirm_action.shortcut},
-                    "cancel_action": {"shortcut": self.cancel_action.shortcut},
-                    "food_action": {"shortcut": self.food_action.shortcut},
-                    "potion_action": {"shortcut": self.potion_action.shortcut},
-                    "recipe_book_action": {"shortcut": self.recipe_book_action.shortcut},
-                    "up_action": {"shortcut": self.up_action.shortcut},
-                    "down_action": {"shortcut": self.down_action.shortcut},
-                    "left_action": {"shortcut": self.left_action.shortcut},
-                    "right_action": {"shortcut": self.right_action.shortcut}
-                }
+                "fixed_actions": {name : {"shortcut": self.__getattribute__(name).shortcut} for name in fixed_actions_vars.keys() if "f_action" in name}
             }
             
             # Save to file
@@ -457,28 +456,11 @@ class XIVAutoCrafterModel:
             
             # Load fixed actions
             if "fixed_actions" in data:
-                fixed_actions = data["fixed_actions"]
-                try:
-                    if "confirm_action" in fixed_actions:
-                        self.confirm_action.shortcut = fixed_actions["confirm_action"]["shortcut"]
-                    if "cancel_action" in fixed_actions:
-                        self.cancel_action.shortcut = fixed_actions["cancel_action"]["shortcut"]
-                    if "food_action" in fixed_actions:
-                        self.food_action.shortcut = fixed_actions["food_action"]["shortcut"]
-                    if "potion_action" in fixed_actions:
-                        self.potion_action.shortcut = fixed_actions["potion_action"]["shortcut"]
-                    if "recipe_book_action" in fixed_actions:
-                        self.recipe_book_action.shortcut = fixed_actions["recipe_book_action"]["shortcut"]
-                    if "up_action" in fixed_actions:
-                        self.up_action.shortcut = fixed_actions["up_action"]["shortcut"]
-                    if "down_action" in fixed_actions:
-                        self.down_action.shortcut = fixed_actions["down_action"]["shortcut"]
-                    if "left_action" in fixed_actions:
-                        self.left_action.shortcut = fixed_actions["left_action"]["shortcut"]
-                    if "right_action" in fixed_actions:
-                        self.right_action.shortcut = fixed_actions["right_action"]["shortcut"]
-                except Exception as e:
-                    pass
+                for name, action in data["fixed_actions"].items():
+                    try:
+                        self.__getattribute__(name).shortcut = action["shortcut"]
+                    except Exception as e:
+                        pass
             
         except Exception as e:
             pass

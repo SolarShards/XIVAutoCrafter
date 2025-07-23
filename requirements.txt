@@ -2,12 +2,9 @@
 customtkinter
 CTkToolTip
 
-# Image processing and computer vision
-pillow
-numpy
-opencv-python
-
 # Windows automation
 pywin32
-pyautogui
 pywinauto
+
+# OCR for text detection
+screen-ocr[winrt]
