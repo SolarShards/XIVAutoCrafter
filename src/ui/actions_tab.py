@@ -172,15 +172,15 @@ class ActionsTab(ctk.CTkFrame):
                 raise TypeError("Wrong notification type (expected dict of fixed actions)")
             
             # Update fixed action shortcuts from the dictionary
-            self._confirm_key_input.set_key_combo(content.get("confirm_action", ""))
-            self._cancel_key_input.set_key_combo(content.get("cancel_action", ""))
-            self._food_key_input.set_key_combo(content.get("food_action", ""))
-            self._potion_key_input.set_key_combo(content.get("potion_action", ""))
-            self._recipe_book_key_input.set_key_combo(content.get("recipe_book_action", ""))
-            self._up_key_input.set_key_combo(content.get("up_action", ""))
-            self._down_key_input.set_key_combo(content.get("down_action", ""))
-            self._left_key_input.set_key_combo(content.get("left_action", ""))
-            self._right_key_input.set_key_combo(content.get("right_action", ""))
+            self._confirm_key_input.set_key_combo(content.get("confirm_f_action", ""))
+            self._cancel_key_input.set_key_combo(content.get("cancel_f_action", ""))
+            self._food_key_input.set_key_combo(content.get("food_f_action", ""))
+            self._potion_key_input.set_key_combo(content.get("potion_f_action", ""))
+            self._recipe_book_key_input.set_key_combo(content.get("recipe_book_f_action", ""))
+            self._up_key_input.set_key_combo(content.get("up_f_action", ""))
+            self._down_key_input.set_key_combo(content.get("down_f_action", ""))
+            self._left_key_input.set_key_combo(content.get("left_f_action", ""))
+            self._right_key_input.set_key_combo(content.get("right_f_action", ""))
 
     def _on_fixed_action_changed(self, action_type: FixedActionType):
         """

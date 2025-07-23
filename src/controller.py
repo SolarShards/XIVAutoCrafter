@@ -48,17 +48,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         self._view.notify(Notification.ACTION_LIST, self._model.actions.keys())
         
         # Notify view about all fixed action shortcuts as a dictionary
-        fixed_actions = {
-            "confirm_action": self._model.confirm_action.shortcut,
-            "cancel_action": self._model.cancel_action.shortcut,
-            "food_action": self._model.food_action.shortcut,
-            "potion_action": self._model.potion_action.shortcut,
-            "recipe_book_action": self._model.recipe_book_action.shortcut,
-            "up_action": self._model.up_action.shortcut,
-            "down_action": self._model.down_action.shortcut,
-            "left_action": self._model.left_action.shortcut,
-            "right_action": self._model.right_action.shortcut
-        }
+        fixed_actions = {name: self._model.__getattribute__(name).shortcut for name in vars(self._model).keys() if "f_action" in name}
         self._view.notify(Notification.FIXED_ACTIONS, fixed_actions)
 
     def add_recipe(self, name: str, action_names: list[str], use_food: bool = False, use_potion: bool = False, use_hq_ingredients: bool = False) -> bool:
@@ -296,16 +286,16 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Internal method to keep the comfirm action from stopping the crafting process.
         """
         if self._model.find_craft_window():
-            self._model.confirm_action.execute()
+            self._model.confirm_f_action.execute()
         
     def _manage_buffs(self) -> bool:
         """
         Internal method to manage food and potion buffs during crafting.
         Checks if buffs are active and reapplies them if necessary.
         """
-        if not self._model.food_action.shortcut:
+        if not self._model.food_f_action.shortcut:
             raise self.CraftingError("Food action not configured.")
-        if not self._model.potion_action.shortcut:
+        if not self._model.potion_f_action.shortcut:
             raise self.CraftingError("Potion action not configured.")
         
         must_eat = self._food_time is None or (time.time() - self._food_time) > FOOD_DURATION
@@ -314,17 +304,17 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         # Check food buff
         if must_eat or must_drink:
             if self._model.find_craft_window():
-                self._model.recipe_book_action.execute()
+                self._model.recipe_book_f_action.execute()
                 time.sleep(1)  # Allow time for the character to get up
             if must_eat:
                 self._view.log("Using food (30 minute buff)...")
                 self._food_time = time.time()
-                self._model.food_action.execute()
+                self._model.food_f_action.execute()
             if must_drink:
                 self._view.log("Using potion (15 minute buff)...")
                 self._potion_time = time.time()
-                self._model.potion_action.execute()
-            self._model.recipe_book_action.execute()
+                self._model.potion_f_action.execute()
+            self._model.recipe_book_f_action.execute()
             return True
         return False
 
@@ -332,14 +322,14 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         """
         Inputs to set the all ingredients in HQ.
         """
-        self._model.down_action.execute()
-        self._model.down_action.execute()
-        self._model.right_action.execute()
-        self._model.down_action.execute()
-        self._model.confirm_action.execute()
-        self._model.up_action.execute()
-        self._model.up_action.execute()
-        self._model.up_action.execute()
+        self._model.down_f_action.execute()
+        self._model.down_f_action.execute()
+        self._model.right_f_action.execute()
+        self._model.down_f_action.execute()
+        self._model.confirm_f_action.execute()
+        self._model.up_f_action.execute()
+        self._model.up_f_action.execute()
+        self._model.up_f_action.execute()
 
     def _crafting_loop(self) -> None:
         """
@@ -353,7 +343,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             return
         
         if self._model.find_craft_window():
-            self._model.recipe_book_action.execute()
+            self._model.recipe_book_f_action.execute()
 
         buffed = False
 
@@ -370,7 +360,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
                     if self._state == ControllerState.STOPPED:
                         break
                     self._pause_event.wait(1)
-                    self._model.recipe_book_action.execute()
+                    self._model.recipe_book_f_action.execute()
 
             if recipe.use_food or recipe.use_potion:
                 buffed = self._manage_buffs()
@@ -385,12 +375,10 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             self._view.log(f"Crafting item {i+1}/{self._quantity}...")
 
             # Execute the recipe actions
-            time.sleep(1)  # Allow time for the character to sit down
+            self._pause_event.wait(1)  # Allow time for the character to sit down
             recipe.execute(self._model.actions)
 
             self._view.set_progress((i+1)/self._quantity)
-
-            from_scratch = False
 
         self.stop_crafting()
 
@@ -401,7 +389,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for confirming actions
         """
-        self._model.confirm_action.shortcut = shortcut
+        self._model.confirm_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_cancel_action(self, shortcut: str) -> None:
@@ -411,7 +399,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for cancelling actions
         """
-        self._model.cancel_action.shortcut = shortcut
+        self._model.cancel_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_food_action(self, shortcut: str) -> None:
@@ -421,7 +409,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for consuming food
         """
-        self._model.food_action.shortcut = shortcut
+        self._model.food_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_potion_action(self, shortcut: str) -> None:
@@ -431,7 +419,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for drinking a CP potion
         """
-        self._model.potion_action.shortcut = shortcut
+        self._model.potion_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_recipe_book_action(self, shortcut: str) -> None:
@@ -441,7 +429,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for opening/closing the recipe book
         """
-        self._model.recipe_book_action.shortcut = shortcut
+        self._model.recipe_book_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_up_action(self, shortcut: str) -> None:
@@ -451,7 +439,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for moving up
         """
-        self._model.up_action.shortcut = shortcut
+        self._model.up_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_down_action(self, shortcut: str) -> None:
@@ -461,7 +449,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for moving down
         """
-        self._model.down_action.shortcut = shortcut
+        self._model.down_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_left_action(self, shortcut: str) -> None:
@@ -471,7 +459,7 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for moving left
         """
-        self._model.left_action.shortcut = shortcut
+        self._model.left_f_action.shortcut = shortcut
         self._model.save_data()
 
     def set_right_action(self, shortcut: str) -> None:
@@ -481,5 +469,5 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
         Args:
             shortcut: The key combination for moving right
         """
-        self._model.right_action.shortcut = shortcut
+        self._model.right_f_action.shortcut = shortcut
         self._model.save_data()

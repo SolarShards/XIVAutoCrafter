@@ -41,13 +41,9 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 ; Main executable (will be created by PyInstaller)
 Source: "dist\XIVAutoCrafter.exe"; DestDir: "{app}"; Flags: ignoreversion
 
-; Image templates (required for the application to function)
-Source: "image_templates\*"; DestDir: "{app}\image_templates"; Flags: ignoreversion recursesubdirs createallsubdirs
-
 ; Documentation
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
-Source: "FREE-SOFTWARE-NOTICE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Python source files (optional, for transparency)
 Source: "main.py"; DestDir: "{app}\src"; Flags: ignoreversion

@@ -2,23 +2,16 @@
 Model components for the XIV Auto Crafter application.
 Contains data classes and business logic for actions, recipes, and game automation.
 """
-
 import win32gui
-import win32ui
-import ctypes
-import os
+from pywinauto import Application, findwindows
+import screen_ocr
 import sys
 import time
 import json
 from pathlib import Path
-from PIL import Image
-from PIL.ImageFile import ImageFile
-from typing import Optional
-import numpy as np
-import cv2
-from pywinauto import Application, findwindows
 
 WINDOW_TITLE = "FINAL FANTASY XIV"
+CRAFTING_LOG_TITLES = ["Crafting log", "Carnet d'artisanat", "HANDWERKER-NOTIZBUCH", "CRAFTING LOG"]
 
 # Determine the correct location for data.json
 # When running as a PyInstaller executable, use the executable's directory
@@ -364,159 +357,66 @@ class XIVAutoCrafterModel:
     Manages recipes, actions, templates, and provides game automation functionality.
     """
     
-    def __init__(self, lang: str = "fr"):
+    def __init__(self):
         """
         Initialize the model with language settings and preload image templates.
         
         Args:
             lang: Language code for template images (defaults to "fr")
         """
-        self.lang = lang
         self.recipes = dict[str, Recipe]()
         self.actions = dict[str, Action]()
-        self.templates = dict[str, ImageFile]()
-        
-        # Determine the correct base path for templates
-        if getattr(sys, 'frozen', False):
-            # Running as PyInstaller executable
-            base_path = Path(sys.executable).parent
-        else:
-            # Running as script
-            base_path = Path(__file__).parent.parent
         
         # Fixed actions for crafting operations
-        self.confirm_action = Action("", 0.5)
-        self.cancel_action = Action("", 0.5)
-        self.food_action = Action("", 2)
-        self.potion_action = Action("", 2)
-        self.recipe_book_action = Action("", 1)
-        self.up_action = Action("", 0.5)
-        self.down_action = Action("", 0.5)
-        self.left_action = Action("", 0.5)
-        self.right_action = Action("", 0.5)
+        self.confirm_f_action = Action("", 0.5)
+        self.cancel_f_action = Action("", 0.5)
+        self.food_f_action = Action("", 2)
+        self.potion_f_action = Action("", 2)
+        self.recipe_book_f_action = Action("", 1)
+        self.up_f_action = Action("", 0.5)
+        self.down_f_action = Action("", 0.5)
+        self.left_f_action = Action("", 0.5)
+        self.right_f_action = Action("", 0.5)
 
-        for name in ["craft_window.png", "craft_button.png"]:
-            template_path = base_path / 'image_templates' / lang / name
-            if template_path.exists():
-                self.templates[name] = Image.open(template_path)
-            else:
-                self.templates[name] = None
+        self._crafting_log_text = None
 
-    def _capture_window(self, window_title: str) -> Optional[Image.Image]:
-        """
-        Capture the contents of a window by its title, even if it is not in the foreground.
-        
-        Args:
-            window_title: The title of the window to capture
-            
-        Returns:
-            PIL Image of the window contents or None if window not found or capture fails
-        """
-        hwnd = win32gui.FindWindow(None, window_title)
-        if not hwnd:
-            return None
-        left, top, right, bottom = win32gui.GetClientRect(hwnd)
-        left, top = win32gui.ClientToScreen(hwnd, (left, top))
-        right, bottom = win32gui.ClientToScreen(hwnd, (right, bottom))
-        width = right - left
-        height = bottom - top
-        hwndDC = win32gui.GetWindowDC(hwnd)
-        mfcDC = win32ui.CreateDCFromHandle(hwndDC)
-        saveDC = mfcDC.CreateCompatibleDC()
-        saveBitMap = win32ui.CreateBitmap()
-        saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
-        saveDC.SelectObject(saveBitMap)
-        # Use ctypes for PrintWindow
-        result = ctypes.windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 1)
-        bmpinfo = saveBitMap.GetInfo()
-        bmpstr = saveBitMap.GetBitmapBits(True)
-        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
-        win32gui.DeleteObject(saveBitMap.GetHandle())
-        saveDC.DeleteDC()
-        mfcDC.DeleteDC()
-        win32gui.ReleaseDC(hwnd, hwndDC)
-        if result != 1:
-            return None
-        return img
-
-    def _find_template_in_image(self, img: Image.Image, template_name: str, threshold: float = 0.8) -> Optional[tuple]:
-        """
-        Detects a preloaded template image inside another image using OpenCV template matching.
-        
-        Args:
-            img: The source image to search within
-            template_name: Name of the template image to search for
-            threshold: Confidence threshold for template matching (defaults to 0.8)
-            
-        Returns:
-            Tuple of (x, y) center coordinates of the best match if above threshold, else None
-        """
-        template = self.templates.get(template_name)
-        if template is None:
-            return None
-        img_cv = np.array(img.convert('RGB'))
-        template_cv = np.array(template.convert('RGB'))
-        res = cv2.matchTemplate(img_cv, template_cv, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        if max_val >= threshold:
-            w, h = template.size
-            center_x = max_loc[0] + w // 2
-            center_y = max_loc[1] + h // 2
-            return (center_x, center_y)
-        return None
+        self._ocr_reader = screen_ocr.Reader.create_quality_reader()
 
     def find_craft_window(self) -> bool:
-        """
-        Searches for craft_window.png in the FINAL FANTASY XIV window.
-        
-        Returns:
-            True if craft window template is found, False otherwise
-        """
-        img = self._capture_window(WINDOW_TITLE)
-        if img is None:
-            return False
-        window_center = self._find_template_in_image(img, "craft_window.png")
-        if window_center:
-            return True
-        else:
-            return False
+        try:
+            hwnd = win32gui.FindWindow(None, WINDOW_TITLE)
+            if not hwnd:
+                return False
+                
+            window_rect = win32gui.GetWindowRect(hwnd)
+            result = self._ocr_reader.read_screen(window_rect)
 
-    def find_craft_button(self) -> Optional[tuple]:
-        """
-        Searches for craft_button.png in the FINAL FANTASY XIV window.
+            if self._crafting_log_text is not None:
+                matches = result.find_matching_words(self._crafting_log_text)
+                if matches and len(matches) > 0:
+                    return True
+            else:
+                for text in CRAFTING_LOG_TITLES:
+                    matches = result.find_matching_words(text)
+                    if matches and len(matches) > 0:
+                        self._crafting_log_text = text
+                        return True
+            return False
+        except Exception:
+            return False
         
-        Returns:
-            Tuple of (x, y) center coordinates if craft button is found, None otherwise
-        """
-        img = self._capture_window(WINDOW_TITLE)
-        if img is None:
-            return None
-        button_center = self._find_template_in_image(img, "craft_button.png")
-        if button_center:
-            return button_center
-        else:
-            return None
 
     def save_data(self) -> None:
         """
         Save recipes and actions to JSON file.
         """
         try:
+            fixed_actions_vars = vars(self)
             # Prepare data structure
             data = {
                 "recipes": {name: recipe.to_dict() for name, recipe in self.recipes.items()},
                 "actions": {name: action.to_dict() for name, action in self.actions.items()},
-                "fixed_actions": {
-                    "confirm_action": {"shortcut": self.confirm_action.shortcut},
-                    "cancel_action": {"shortcut": self.cancel_action.shortcut},
-                    "food_action": {"shortcut": self.food_action.shortcut},
-                    "potion_action": {"shortcut": self.potion_action.shortcut},
-                    "recipe_book_action": {"shortcut": self.recipe_book_action.shortcut},
-                    "up_action": {"shortcut": self.up_action.shortcut},
-                    "down_action": {"shortcut": self.down_action.shortcut},
-                    "left_action": {"shortcut": self.left_action.shortcut},
-                    "right_action": {"shortcut": self.right_action.shortcut}
-                }
+                "fixed_actions": {name : {"shortcut": self.__getattribute__(name).shortcut} for name in fixed_actions_vars.keys() if "f_action" in name}
             }
             
             # Save to file
@@ -556,28 +456,11 @@ class XIVAutoCrafterModel:
             
             # Load fixed actions
             if "fixed_actions" in data:
-                fixed_actions = data["fixed_actions"]
-                try:
-                    if "confirm_action" in fixed_actions:
-                        self.confirm_action.shortcut = fixed_actions["confirm_action"]["shortcut"]
-                    if "cancel_action" in fixed_actions:
-                        self.cancel_action.shortcut = fixed_actions["cancel_action"]["shortcut"]
-                    if "food_action" in fixed_actions:
-                        self.food_action.shortcut = fixed_actions["food_action"]["shortcut"]
-                    if "potion_action" in fixed_actions:
-                        self.potion_action.shortcut = fixed_actions["potion_action"]["shortcut"]
-                    if "recipe_book_action" in fixed_actions:
-                        self.recipe_book_action.shortcut = fixed_actions["recipe_book_action"]["shortcut"]
-                    if "up_action" in fixed_actions:
-                        self.up_action.shortcut = fixed_actions["up_action"]["shortcut"]
-                    if "down_action" in fixed_actions:
-                        self.down_action.shortcut = fixed_actions["down_action"]["shortcut"]
-                    if "left_action" in fixed_actions:
-                        self.left_action.shortcut = fixed_actions["left_action"]["shortcut"]
-                    if "right_action" in fixed_actions:
-                        self.right_action.shortcut = fixed_actions["right_action"]["shortcut"]
-                except Exception as e:
-                    pass
+                for name, action in data["fixed_actions"].items():
+                    try:
+                        self.__getattribute__(name).shortcut = action["shortcut"]
+                    except Exception as e:
+                        pass
             
         except Exception as e:
             pass

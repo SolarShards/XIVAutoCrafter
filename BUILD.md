@@ -1,5 +1,7 @@
 # XIVAutoCrafter - Build Instructions
 
+XIVAutoCrafter uses OCR-based text detection for reliable game automation. This document covers building and packaging the application.
+
 ## Quick Start
 
 ### Option 1: Simple Executable Build
@@ -23,9 +25,14 @@
 ## Requirements
 
 ### For Building Executable
-- Python 3.8+
+- Python 3.8+ (tested with 3.12)
 - pip (Python package manager)
-- All packages from requirements.txt (auto-installed)
+- Core dependencies (auto-installed):
+  - `customtkinter (5.2.2)`: Modern UI framework
+  - `CTkToolTip (0.8)`: Enhanced tooltips
+  - `screen-ocr (0.5.0)`: OCR with WinRT support
+  - `pywin32 (308)`: Windows API integration
+  - `pywinauto (0.6.9)`: Windows automation
 
 ### For Creating Installer
 - Everything above, plus:
@@ -34,10 +41,10 @@
 ## What Gets Included
 
 Both build methods include:
-- ✅ XIVAutoCrafter executable
-- ✅ All image templates (`image_templates/` folder)
+- ✅ XIVAutoCrafter executable with OCR capabilities
 - ✅ All Python libraries and dependencies
-- ✅ Documentation files
+- ✅ Documentation files (README.md, LICENSE.txt)
+- ✅ Multi-language OCR support (EN/FR/DE/JP)
 
 **Note**: `data.json` configuration file will be created automatically next to the executable when you first configure the application.
 
@@ -50,8 +57,8 @@ Both build methods include:
 
 ### Manual/Portable
 - Wherever you place the executable
-- Keep `image_templates\` folder in the same directory
 - `data.json` will be created automatically when needed
+- No additional files required (OCR detection is built-in)
 
 ## Troubleshooting
 
@@ -69,3 +76,11 @@ Both build methods include:
 - Windows Defender may flag the executable initially (false positive)
 - Add exclusion for the XIVAutoCrafter folder if needed
 - Ensure FFXIV is running before starting the application
+- OCR requires Windows 10/11 for optimal performance
+
+## OCR Technology
+
+### Screen-OCR Features
+- **WinRT Integration**: Uses Windows Runtime OCR APIs for high accuracy
+- **Multi-language Support**: Automatically detects EN/FR/DE/JP text
+- **Smart Caching**: Remembers detected language for faster subsequent detection
