@@ -6,6 +6,7 @@ import win32gui
 from pywinauto import Application, findwindows
 import screen_ocr
 import sys
+import os
 import time
 import json
 from pathlib import Path
@@ -14,13 +15,14 @@ WINDOW_TITLE = "FINAL FANTASY XIV"
 CRAFTING_LOG_TITLES = ["Crafting log", "Carnet d'artisanat", "HANDWERKER-NOTIZBUCH", "CRAFTING LOG"]
 
 # Determine the correct location for data.json
-# When running as a PyInstaller executable, use the executable's directory
-# When running as a script, use the parent directory of the script
+# Store user data in AppData to persist across reinstalls
 if getattr(sys, 'frozen', False):
-    # Running as PyInstaller executable
-    SAVE_LOCATION = Path(sys.executable).parent / "data.json"
+    # Running as PyInstaller executable - use AppData for user data
+    appdata_dir = Path(os.environ.get('APPDATA', '')) / "XIVAutoCrafter"
+    appdata_dir.mkdir(exist_ok=True)  # Create directory if it doesn't exist
+    SAVE_LOCATION = appdata_dir / "data.json"
 else:
-    # Running as script
+    # Running as script - use the parent directory of the script
     SAVE_LOCATION = Path(__file__).parent.parent / "data.json"
 
 # Global Application instance for FFXIV window automation

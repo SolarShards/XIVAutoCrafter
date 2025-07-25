@@ -46,7 +46,7 @@ Both build methods include:
 - ✅ Documentation files (README.md, LICENSE.txt)
 - ✅ Multi-language OCR support (EN/FR/DE/JP)
 
-**Note**: `data.json` configuration file will be created automatically next to the executable when you first configure the application.
+**Note**: `data.json` configuration file will be created automatically in your AppData when you first configure the application.
 
 ## Installation Locations
 
