@@ -109,8 +109,9 @@ class ActionsTab(ctk.CTkFrame):
         Args:
             dialog_type: Type of dialog operation (ADD or MODIFY)
         """
-        if dialog_type == ActionDialogType.MODIFY and self._selected_custom_action is None:
-            return
+        if dialog_type == ActionDialogType.MODIFY:
+            if self._selected_custom_action is None or self._controller_state != ControllerState.STOPPED:
+                return
         CustomActionDialog(
             self,
             dialog_type,
@@ -166,6 +167,8 @@ class ActionsTab(ctk.CTkFrame):
                 btn.pack(pady=2, fill="x")
                 self._custom_actions[name] = btn
             self._selected_custom_action = None
+            if self._select_custom_action in self._custom_actions.keys():
+                self._select_custom_action(self._selected_custom_action)
         
         elif notification_type == Notification.FIXED_ACTIONS:
             if not isinstance(content, dict):

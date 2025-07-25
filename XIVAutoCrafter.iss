@@ -49,10 +49,15 @@ Source: "LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "main.py"; DestDir: "{app}\src"; Flags: ignoreversion
 Source: "src\*"; DestDir: "{app}\src\src"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Create a placeholder file to ensure user data directory exists
+; This also serves as a marker for the data directory location
+Source: "README.md"; DestDir: "{code:GetDataDir}"; DestName: "README_DataLocation.txt"; Flags: ignoreversion
+
 [Icons]
 ; Start Menu shortcuts
 Name: "{group}\XIVAutoCrafter"; Filename: "{app}\XIVAutoCrafter.exe"; Comment: "Launch XIVAutoCrafter"
 Name: "{group}\XIVAutoCrafter Documentation"; Filename: "{app}\README.md"; Comment: "View XIVAutoCrafter documentation"
+Name: "{group}\Open User Data Folder"; Filename: "{code:GetDataDir}"; Comment: "Open folder containing your recipes and settings"
 Name: "{group}\{cm:ProgramOnTheWeb,XIVAutoCrafter}"; Filename: "https://github.com/SolarShards/XIVAutoCrafter"
 Name: "{group}\{cm:UninstallProgram,XIVAutoCrafter}"; Filename: "{uninstallexe}"
 
@@ -69,17 +74,34 @@ Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\{{A7B8C
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\{{A7B8C9D0-E1F2-4567-8901-234567890ABC}_is1"; ValueType: string; ValueName: "Publisher"; ValueData: "SolarShards"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\{{A7B8C9D0-E1F2-4567-8901-234567890ABC}_is1"; ValueType: string; ValueName: "URLInfoAbout"; ValueData: "https://github.com/SolarShards/XIVAutoCrafter"; Flags: uninsdeletekey
 
+; Store user data directory location for future reference
+Root: HKCU; Subkey: "Software\XIVAutoCrafter"; ValueType: string; ValueName: "UserDataPath"; ValueData: "{code:GetDataDir}"; Flags: uninsdeletevalue
+
 [Run]
 ; Option to launch the application after installation
 Filename: "{app}\XIVAutoCrafter.exe"; Description: "{cm:LaunchProgram,XIVAutoCrafter}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+var
+  UserDataDir: string;
+
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+  UserDataDir := ExpandConstant('{userappdata}\XIVAutoCrafter');
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
     // Create user data directory in AppData if needed
-    if not DirExists(ExpandConstant('{userappdata}\XIVAutoCrafter')) then
-      CreateDir(ExpandConstant('{userappdata}\XIVAutoCrafter'));
+    if not DirExists(UserDataDir) then
+      CreateDir(UserDataDir);
   end;
+end;
+
+function GetDataDir(Param: string): string;
+begin
+  Result := UserDataDir;
 end;

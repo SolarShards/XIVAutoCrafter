@@ -280,15 +280,8 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             self._state = ControllerState.RUNNING
             self._pause_event.set()
             self._view.notify(Notification.CONTROLLER_STATE, self._state)
-
-    def _confirm(self) -> None:
-        """
-        Internal method to keep the comfirm action from stopping the crafting process.
-        """
-        if self._model.find_craft_window():
-            self._model.confirm_f_action.execute()
         
-    def _manage_buffs(self) -> bool:
+    def _manage_buffs(self, recipe: Recipe) -> bool:
         """
         Internal method to manage food and potion buffs during crafting.
         Checks if buffs are active and reapplies them if necessary.
@@ -297,25 +290,33 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             raise self.CraftingError("Food action not configured.")
         if not self._model.potion_f_action.shortcut:
             raise self.CraftingError("Potion action not configured.")
-        
-        must_eat = self._food_time is None or (time.time() - self._food_time) > FOOD_DURATION
-        must_drink = self._potion_time is None or (time.time() - self._potion_time) > POTION_DURATION
-        
+
+        must_eat = recipe.use_food and (self._food_time is None or (time.time() - self._food_time) > FOOD_DURATION)
+        must_drink = recipe.use_potion and (self._potion_time is None or (time.time() - self._potion_time) > POTION_DURATION)
+
         # Check food buff
         if must_eat or must_drink:
+
             if self._model.find_craft_window():
                 self._model.recipe_book_f_action.execute()
                 time.sleep(1)  # Allow time for the character to get up
+
             if must_eat:
                 self._view.log("Using food (30 minute buff)...")
                 self._food_time = time.time()
                 self._model.food_f_action.execute()
+
             if must_drink:
                 self._view.log("Using potion (15 minute buff)...")
                 self._potion_time = time.time()
                 self._model.potion_f_action.execute()
+
             self._model.recipe_book_f_action.execute()
+            self._model.confirm_f_action.execute()
+            self._model.confirm_f_action.execute()
+            self._model.confirm_f_action.execute()
             return True
+        
         return False
 
     def _set_hq(self):
@@ -341,11 +342,16 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
             self._view.log(error_msg, severity=LogSeverity.ERROR)
             self.stop_crafting()
             return
-        
-        if self._model.find_craft_window():
-            self._model.recipe_book_f_action.execute()
 
-        buffed = False
+        just_buffed = False
+
+        # Wait for the craft window to be visible
+        if not self._model.find_craft_window():
+            self._view.log("Waiting for craft window to be ready.\nMake sure the game window is visible",severity=LogSeverity.INFO)
+            while not self._model.find_craft_window():
+                if self._state == ControllerState.STOPPED:
+                    break
+                time.sleep(1)
 
         # Main crafting loop
         for i in range(self._quantity):
@@ -354,30 +360,22 @@ class XIVAutoCrafterController(AutoCrafterControllerInterface):
                 break
             self._pause_event.wait()
 
-            if not self._model.find_craft_window():
-                self._view.log("Waiting for craft window to be ready...", severity=LogSeverity.INFO)
-                while not self._model.find_craft_window():
-                    if self._state == ControllerState.STOPPED:
-                        break
-                    self._pause_event.wait(1)
-                    self._model.recipe_book_f_action.execute()
+            # Manage buffs before each item
+            just_buffed = self._manage_buffs(recipe)
+            if not just_buffed:
+                self._model.confirm_f_action.execute()
 
-            if recipe.use_food or recipe.use_potion:
-                buffed = self._manage_buffs()
-            self._confirm()
-            self._confirm()
-            self._confirm()
-            if recipe.use_hq_ingredients and (buffed or i == 0):
+            # Manage HQ selection on first item or if buffs were just applied
+            if recipe.use_hq_ingredients and (just_buffed or i == 0):
                 self._set_hq()
 
-            self._confirm()
-
+            # Start the crafting process
+            self._model.confirm_f_action.execute()
             self._view.log(f"Crafting item {i+1}/{self._quantity}...")
 
-            # Execute the recipe actions
-            self._pause_event.wait(1)  # Allow time for the character to sit down
+            time.sleep(1)  # Allow time for the character to sit down
             recipe.execute(self._model.actions)
-
+            time.sleep(1)
             self._view.set_progress((i+1)/self._quantity)
 
         self.stop_crafting()

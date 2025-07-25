@@ -77,9 +77,13 @@ class CraftTab(ctk.CTkFrame):
         Args:
             dialog_type: Type of dialog operation (ADD or MODIFY)
         """
-        if dialog_type == RecipeDialogType.MODIFY and self._selected_recipe is None:
-            self.log("No recipe selected to modify.", LogSeverity.WARNING)
-            return
+        if dialog_type == RecipeDialogType.MODIFY:
+            if self._selected_recipe is None:
+                self.log("No recipe selected to modify.", LogSeverity.WARNING)
+                return
+            if self._controller_state != ControllerState.STOPPED:
+                self.log("Cannot modify recipe while crafting is in progress.", LogSeverity.WARNING)
+                return
         RecipeDialog(
             self,
             dialog_type,
@@ -259,7 +263,10 @@ class CraftTab(ctk.CTkFrame):
                 btn = ctk.CTkButton(self._recipe_list_frame, text=name, width=140, command=lambda n=name: self._select_recipe(n))
                 btn.pack(pady=2, fill="x")
                 self._recipes[name] = btn
-            self._selected_recipe = None
+            if self._selected_recipe in self._recipes.keys():
+                self._select_recipe(self._selected_recipe)
+            else:
+                self._selected_recipe = None
             self.log("Recipe list updated.")
 
 class RecipeDialog(ctk.CTkToplevel):
