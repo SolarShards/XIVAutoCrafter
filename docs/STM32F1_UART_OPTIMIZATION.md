@@ -203,13 +203,28 @@ void DMA_Configuration(void)
     DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)uart2_rx_buffer;
     DMA_Init(DMA1_Channel6, &DMA_InitStructure);
     
-    // Enable DMA channels
+    // USART1 TX DMA (DMA1_Channel4)
+    DMA_DeInit(DMA1_Channel4);
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART1->DR;
+    DMA_InitStructure.DMA_MemoryBaseAddr = 0;  // Set at runtime
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;
+    DMA_InitStructure.DMA_BufferSize = 0;  // Set at runtime
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+    DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+    DMA_Init(DMA1_Channel4, &DMA_InitStructure);
+    
+    // USART2 TX DMA (DMA1_Channel7)
+    DMA_DeInit(DMA1_Channel7);
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART2->DR;
+    DMA_Init(DMA1_Channel7, &DMA_InitStructure);
+    
+    // Enable RX DMA channels
     DMA_Cmd(DMA1_Channel5, ENABLE);
     DMA_Cmd(DMA1_Channel6, ENABLE);
     
     // Enable USART DMA requests
-    USART_DMACmd(USART1, USART_DMAReq_Rx, ENABLE);
-    USART_DMACmd(USART2, USART_DMAReq_Rx, ENABLE);
+    USART_DMACmd(USART1, USART_DMAReq_Rx | USART_DMAReq_Tx, ENABLE);
+    USART_DMACmd(USART2, USART_DMAReq_Rx | USART_DMAReq_Tx, ENABLE);
     
     // Configure DMA interrupts for transfer complete
     DMA_ITConfig(DMA1_Channel5, DMA_IT_TC | DMA_IT_HT, ENABLE);
@@ -230,7 +245,8 @@ void UART_DMA_Send(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel,
                    uint8_t* data, uint16_t size)
 {
     // Wait for previous transfer to complete
-    while (DMA_GetFlagStatus(DMA1_FLAG_TC4) == RESET);
+    // Note: Check the channel's TC bit, not a hardcoded flag
+    while (DMA_GetFlagStatus(DMA_Channel->CNDTR) != 0);
     
     // Disable DMA channel
     DMA_Cmd(DMA_Channel, DISABLE);
@@ -322,12 +338,14 @@ volatile uint8_t active_buffer = 0;
 void DMA_IRQ_Handler(void)
 {
     if (DMA_GetITStatus(DMA1_IT_HT5)) {
-        // Process buffer_a while DMA fills buffer_b
-        active_buffer = 0;
+        // Half-transfer: DMA is filling second half, process first half
+        active_buffer = 1;
+        DMA_ClearITPendingBit(DMA1_IT_HT5);
     }
     if (DMA_GetITStatus(DMA1_IT_TC5)) {
-        // Process buffer_b while DMA wraps to buffer_a
-        active_buffer = 1;
+        // Transfer complete: DMA wraps to first half, process second half
+        active_buffer = 0;
+        DMA_ClearITPendingBit(DMA1_IT_TC5);
     }
 }
 ```
