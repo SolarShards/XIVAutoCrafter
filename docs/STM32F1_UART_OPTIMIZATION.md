@@ -244,9 +244,8 @@ void DMA_Configuration(void)
 void UART_DMA_Send(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel, 
                    uint8_t* data, uint16_t size)
 {
-    // Wait for previous transfer to complete
-    // Note: Check the channel's TC bit, not a hardcoded flag
-    while (DMA_GetFlagStatus(DMA_Channel->CNDTR) != 0);
+    // Wait for previous transfer to complete by checking data counter
+    while (DMA_GetCurrDataCounter(DMA_Channel) != 0);
     
     // Disable DMA channel
     DMA_Cmd(DMA_Channel, DISABLE);
@@ -330,22 +329,36 @@ int main(void)
 ```c
 // Use double buffering for continuous transfer
 #define BUFFER_SIZE 512  // Power of 2 for efficiency
-uint8_t buffer_a[BUFFER_SIZE];
-uint8_t buffer_b[BUFFER_SIZE];
-volatile uint8_t active_buffer = 0;
+uint8_t rx_buffer[BUFFER_SIZE];
+volatile uint16_t last_processed_pos = 0;
 
-// Switch buffers on half-transfer and transfer-complete interrupts
+// Process data on half-transfer and transfer-complete interrupts
 void DMA_IRQ_Handler(void)
 {
+    uint16_t current_pos;
+    
     if (DMA_GetITStatus(DMA1_IT_HT5)) {
         // Half-transfer: DMA is filling second half, process first half
-        active_buffer = 1;
         DMA_ClearITPendingBit(DMA1_IT_HT5);
+        current_pos = BUFFER_SIZE / 2;
+        
+        // Process data from last_processed_pos to current_pos
+        for (uint16_t i = last_processed_pos; i < current_pos; i++) {
+            // Forward data to other UART or process it
+            // Example: USART_SendData(USART2, rx_buffer[i]);
+        }
+        last_processed_pos = current_pos;
     }
     if (DMA_GetITStatus(DMA1_IT_TC5)) {
         // Transfer complete: DMA wraps to first half, process second half
-        active_buffer = 0;
         DMA_ClearITPendingBit(DMA1_IT_TC5);
+        current_pos = BUFFER_SIZE;
+        
+        // Process data from last_processed_pos to current_pos
+        for (uint16_t i = last_processed_pos; i < current_pos; i++) {
+            // Forward data to other UART or process it
+        }
+        last_processed_pos = 0;  // Wrap to beginning
     }
 }
 ```
