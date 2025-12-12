@@ -264,7 +264,7 @@ void UART_DMA_Send(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel,
 void DMA1_Channel5_IRQHandler(void)
 {
     // USART1 RX complete - forward to USART2
-    if (DMA_GetITStatus(DMA1_IT_TC5))
+    if (DMA_GetITStatus(DMA1_IT_TC5) == SET)
     {
         DMA_ClearITPendingBit(DMA1_IT_TC5);
         // Get number of bytes received
@@ -275,7 +275,7 @@ void DMA1_Channel5_IRQHandler(void)
         }
     }
     
-    if (DMA_GetITStatus(DMA1_IT_HT5))
+    if (DMA_GetITStatus(DMA1_IT_HT5) == SET)
     {
         DMA_ClearITPendingBit(DMA1_IT_HT5);
         // Half-transfer complete - can process first half of buffer
@@ -285,7 +285,7 @@ void DMA1_Channel5_IRQHandler(void)
 void DMA1_Channel6_IRQHandler(void)
 {
     // USART2 RX complete - forward to USART1
-    if (DMA_GetITStatus(DMA1_IT_TC6))
+    if (DMA_GetITStatus(DMA1_IT_TC6) == SET)
     {
         DMA_ClearITPendingBit(DMA1_IT_TC6);
         uint16_t bytes = BUFFER_SIZE - DMA_GetCurrDataCounter(DMA1_Channel6);
@@ -294,7 +294,7 @@ void DMA1_Channel6_IRQHandler(void)
         }
     }
     
-    if (DMA_GetITStatus(DMA1_IT_HT6))
+    if (DMA_GetITStatus(DMA1_IT_HT6) == SET)
     {
         DMA_ClearITPendingBit(DMA1_IT_HT6);
     }
@@ -339,31 +339,35 @@ void DMA_IRQ_Handler(void)
 {
     uint16_t current_pos;
     
-    if (DMA_GetITStatus(DMA1_IT_HT5)) {
+    if (DMA_GetITStatus(DMA1_IT_HT5) == SET) {
         // Half-transfer: DMA is filling second half, process first half
         DMA_ClearITPendingBit(DMA1_IT_HT5);
         current_pos = BUFFER_SIZE / 2;
         
         // Process data from last_processed_pos to current_pos
-        uint16_t data_length = current_pos - last_processed_pos;
-        if (data_length > 0) {
-            // Forward entire chunk to other UART using DMA (recommended)
-            UART_DMA_Send(USART2, DMA1_Channel7, 
-                         &rx_buffer[last_processed_pos], data_length);
+        if (current_pos >= last_processed_pos) {
+            uint16_t data_length = current_pos - last_processed_pos;
+            if (data_length > 0) {
+                // Forward entire chunk to other UART using DMA (recommended)
+                UART_DMA_Send(USART2, DMA1_Channel7, 
+                             &rx_buffer[last_processed_pos], data_length);
+            }
         }
         last_processed_pos = current_pos;
     }
-    if (DMA_GetITStatus(DMA1_IT_TC5)) {
+    if (DMA_GetITStatus(DMA1_IT_TC5) == SET) {
         // Transfer complete: DMA wraps to first half, process second half
         DMA_ClearITPendingBit(DMA1_IT_TC5);
         current_pos = BUFFER_SIZE;
         
         // Process data from last_processed_pos to current_pos
-        uint16_t data_length = current_pos - last_processed_pos;
-        if (data_length > 0) {
-            // Forward entire chunk to other UART using DMA (recommended)
-            UART_DMA_Send(USART2, DMA1_Channel7, 
-                         &rx_buffer[last_processed_pos], data_length);
+        if (current_pos >= last_processed_pos) {
+            uint16_t data_length = current_pos - last_processed_pos;
+            if (data_length > 0) {
+                // Forward entire chunk to other UART using DMA (recommended)
+                UART_DMA_Send(USART2, DMA1_Channel7, 
+                             &rx_buffer[last_processed_pos], data_length);
+            }
         }
         last_processed_pos = 0;  // Wrap to beginning
     }
