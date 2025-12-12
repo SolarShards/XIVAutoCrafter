@@ -43,7 +43,8 @@ USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 
 #### For UART Transmission (TX)
 ```c
-void UART_DMA_TX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel)
+void UART_DMA_TX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel, 
+                      uint8_t* tx_buffer, uint16_t buffer_size)
 {
     DMA_InitTypeDef DMA_InitStructure;
     
@@ -55,9 +56,9 @@ void UART_DMA_TX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel)
     // Configure DMA for UART TX
     DMA_DeInit(DMA_Channel);
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(USARTx->DR);
-    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)txBuffer;
+    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)tx_buffer;
     DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;  // Memory to Peripheral
-    DMA_InitStructure.DMA_BufferSize = TX_BUFFER_SIZE;
+    DMA_InitStructure.DMA_BufferSize = buffer_size;
     DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
     DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
     DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
@@ -74,7 +75,8 @@ void UART_DMA_TX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel)
 
 #### For UART Reception (RX)
 ```c
-void UART_DMA_RX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel)
+void UART_DMA_RX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel,
+                      uint8_t* rx_buffer, uint16_t buffer_size)
 {
     DMA_InitTypeDef DMA_InitStructure;
     
@@ -86,9 +88,9 @@ void UART_DMA_RX_Init(USART_TypeDef* USARTx, DMA_Channel_TypeDef* DMA_Channel)
     // Configure DMA for UART RX
     DMA_DeInit(DMA_Channel);
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&(USARTx->DR);
-    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)rxBuffer;
+    DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)rx_buffer;
     DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;  // Peripheral to Memory
-    DMA_InitStructure.DMA_BufferSize = RX_BUFFER_SIZE;
+    DMA_InitStructure.DMA_BufferSize = buffer_size;
     DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
     DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
     DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
@@ -343,9 +345,11 @@ void DMA_IRQ_Handler(void)
         current_pos = BUFFER_SIZE / 2;
         
         // Process data from last_processed_pos to current_pos
-        for (uint16_t i = last_processed_pos; i < current_pos; i++) {
-            // Forward data to other UART or process it
-            // Example: USART_SendData(USART2, rx_buffer[i]);
+        uint16_t data_length = current_pos - last_processed_pos;
+        if (data_length > 0) {
+            // Forward entire chunk to other UART using DMA (recommended)
+            UART_DMA_Send(USART2, DMA1_Channel7, 
+                         &rx_buffer[last_processed_pos], data_length);
         }
         last_processed_pos = current_pos;
     }
@@ -355,8 +359,11 @@ void DMA_IRQ_Handler(void)
         current_pos = BUFFER_SIZE;
         
         // Process data from last_processed_pos to current_pos
-        for (uint16_t i = last_processed_pos; i < current_pos; i++) {
-            // Forward data to other UART or process it
+        uint16_t data_length = current_pos - last_processed_pos;
+        if (data_length > 0) {
+            // Forward entire chunk to other UART using DMA (recommended)
+            UART_DMA_Send(USART2, DMA1_Channel7, 
+                         &rx_buffer[last_processed_pos], data_length);
         }
         last_processed_pos = 0;  // Wrap to beginning
     }
@@ -368,12 +375,16 @@ void DMA_IRQ_Handler(void)
 - Use separate DMA channels for TX and RX to avoid conflicts
 - Consider DMA arbitration when multiple channels are used
 
-### 4. UART FIFO (if available on your STM32F1 variant)
-Some STM32F1 devices have UART FIFO - enable it for better performance:
+### 4. DMA Request Enable
+Enable DMA mode in UART control register for both TX and RX:
 ```c
-// Note: Not all STM32F1 variants support this
-// Check your specific device reference manual
-USART1->CR3 |= USART_CR3_DMAR | USART_CR3_DMAT;  // Enable DMA mode
+// Enable DMA requests for UART - required for DMA operation
+// This is already done by USART_DMACmd() in the examples above
+// but can also be set directly:
+USART1->CR3 |= USART_CR3_DMAR | USART_CR3_DMAT;  // Enable DMA RX and TX
+
+// Note: STM32F1 UARTs do not have hardware FIFO buffers
+// All data flows directly between DMA and the UART data register
 ```
 
 ### 5. Clock Configuration
